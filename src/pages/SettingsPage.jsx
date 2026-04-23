@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const [lockDuration, setLockDuration] = useState("30");
   const [noticeDurationDays, setNoticeDurationDays] = useState(30);
   const [noticeTestMode, setNoticeTestMode] = useState(false);
-  const [noticeTestMinutes, setNoticeTestMinutes] = useState(5);
+  const [noticeTestMinutes, setNoticeTestMinutes] = useState(10);
   const [accounts, setAccounts] = useState(mockSystemAccounts);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // Stores account to delete
 
@@ -361,8 +361,10 @@ export default function SettingsPage() {
                       onChange={(e) => setNoticeDurationDays(Number(e.target.value))}
                       className="w-full appearance-none h-2 bg-muted rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--terra-navy)] [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-lg"
                     />
-                    <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                      <span>7 days (min)</span><span>30 days (default)</span><span>90 days (max)</span>
+                    <div className="relative h-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                      <span className="absolute left-0">7 days</span>
+                      <span className="absolute left-[27.7%] -translate-x-1/2 text-[var(--terra-emerald)]">30 days (default)</span>
+                      <span className="absolute right-0">90 days</span>
                     </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground bg-white/50 border rounded-xl p-4 leading-relaxed">
@@ -386,8 +388,10 @@ export default function SettingsPage() {
                       onChange={(e) => setNoticeTestMinutes(Number(e.target.value))}
                       className="w-full appearance-none h-2 bg-muted rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-xl"
                     />
-                    <div className="flex justify-between text-[10px] font-bold text-amber-600/60 uppercase tracking-widest">
-                      <span>1 min</span><span>5 min (default)</span><span>30 min</span>
+                    <div className="relative h-4 text-[10px] font-bold text-amber-600/60 uppercase tracking-widest">
+                      <span className="absolute left-0">1 min</span>
+                      <span className="absolute left-[31.0%] -translate-x-1/2 text-amber-600">10 min (default)</span>
+                      <span className="absolute right-0">30 min</span>
                     </div>
                   </div>
                   <Button onClick={() => toast.success("Test duration applied!")} className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-11 px-8 font-bold">

@@ -9,43 +9,76 @@ import { Button } from "../app/components/ui/button";
 import { Badge } from "../app/components/ui/badge";
 import { Input } from "../app/components/ui/input";
 import { RegisterOfficerModal } from "../app/components/admin/RegisterOfficerModal";
-import { mockOfficers, mockActivityLogs } from "../data/mockData";
 import { motion } from "motion/react";
 import { toast } from "sonner";
+import { useEffect } from "react";
+import api from "../utils/api";
+import { mockActivityLogs } from "../data/mockData";
 
 export default function SuperAdminDashboard() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [officerType, setOfficerType] = useState("lro");
   const [officerSearch, setOfficerSearch] = useState("");
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [officers, setOfficers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const lroCount    = mockOfficers.filter(o => o.role === "LRO").length;
-  const notaryCount = mockOfficers.filter(o => o.role === "Notary").length;
-  const totalUsers  = 248;
+  const fetchOfficers = async () => {
+    try {
+      const response = await api.get('/users');
+      if (response.data.success) {
+        // Filter only LRO and Notary for this page
+        const filtered = response.data.data.filter(u => u.role === "LRO" || u.role === "Notary");
+        setOfficers(filtered);
+      }
+    } catch (err) {
+      console.error("Failed to fetch officers:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOfficers();
+    window.refreshOfficerList = fetchOfficers;
+    return () => delete window.refreshOfficerList;
+  }, []);
+
+  const lroCount    = officers.filter(o => o.role === "LRO").length;
+  const notaryCount = officers.filter(o => o.role === "Notary").length;
+  const totalUsers  = officers.length; // Or fetch total users separately if needed
 
   const stats = [
     { label: "Total LRO Officers",    value: lroCount,    icon: <Building className="w-5 h-5 text-blue-500" />,    change: "+2 this month" },
     { label: "Total Notary Officers", value: notaryCount, icon: <Gavel className="w-5 h-5 text-purple-500" />,     change: "+1 this month" },
     { label: "Total Users",           value: totalUsers,  icon: <Users className="w-5 h-5 text-emerald-500" />,    change: "+12%" },
-    { label: "Log Activity",          value: mockActivityLogs.length, icon: <Activity className="w-5 h-5 text-blue-400" />, change: "Last 24h" },
+    { label: "Log Activity",          value: 12, icon: <Activity className="w-5 h-5 text-blue-400" />, change: "Last 24h" },
   ];
 
   const filteredOfficers = useMemo(() => {
     const q = officerSearch.toLowerCase();
-    if (!q) return mockOfficers;
-    return mockOfficers.filter(o =>
-      o.name.toLowerCase().includes(q) ||
-      o.email.toLowerCase().includes(q) ||
-      o.matricule.toLowerCase().includes(q) ||
-      o.jurisdiction.toLowerCase().includes(q) ||
-      o.role.toLowerCase().includes(q)
-    );
-  }, [officerSearch]);
+    return officers.filter(o => {
+      const name = `${o.firstName || ""} ${o.lastName || ""}`.toLowerCase();
+      const email = (o.email || "").toLowerCase();
+      const matricule = (o.matricule || "").toLowerCase();
+      const jurisdiction = (o.jurisdiction || "").toLowerCase();
+      const role = (o.role || "").toLowerCase();
+
+      return name.includes(q) || email.includes(q) || matricule.includes(q) || jurisdiction.includes(q) || role.includes(q);
+    });
+  }, [officerSearch, officers]);
 
   const openRegister = (type) => {
     setOfficerType(type);
     setIsRegisterOpen(true);
   };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--terra-emerald)]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-12">
@@ -125,10 +158,10 @@ export default function SuperAdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-[var(--terra-navy)]/10 flex items-center justify-center font-bold text-[var(--terra-navy)] text-xs shrink-0">
-                            {officer.name.split(' ').map(n => n[0]).join('')}
+                            {officer.firstName?.[0] || ""}{officer.lastName?.[0] || ""}
                           </div>
                           <div>
-                            <p className="font-semibold text-sm">{officer.name}</p>
+                            <p className="font-semibold text-sm">{officer.firstName || "Unknown"} {officer.lastName || ""}</p>
                             <p className="text-[10px] text-muted-foreground">{officer.email}</p>
                           </div>
                         </div>

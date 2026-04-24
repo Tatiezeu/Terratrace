@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   ShieldAlert, Mail, Users, History, Lock, CircleAlert,
   Smartphone, Database, Activity, ScrollText, Ban, Trash2,
-  CheckCircle2, UserCheck, UserX, X, AlertTriangle, Edit, Download, User
+  CheckCircle2, UserCheck, UserX, X, AlertTriangle, Edit, Download, User, Eye, EyeOff
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -20,17 +20,97 @@ import {
   DialogDescription,
   DialogFooter 
 } from "../app/components/ui/dialog";
-import { mockSystemAccounts, mockActivityLogs } from "../data/mockData";
+import { mockActivityLogs } from "../data/mockData";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
+import api from "../utils/api";
+import { useEffect } from "react";
 
 export default function SettingsPage() {
   const [loginAttempts, setLoginAttempts] = useState("5");
   const [lockDuration, setLockDuration] = useState("30");
+  const [senderEmail, setSenderEmail] = useState("security@terratrace.cm");
+  const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
   const [noticeDurationDays, setNoticeDurationDays] = useState(30);
   const [noticeTestMode, setNoticeTestMode] = useState(false);
   const [noticeTestMinutes, setNoticeTestMinutes] = useState(10);
-  const [accounts, setAccounts] = useState(mockSystemAccounts);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await api.get('/users');
+        if (response.data.success) {
+          setAccounts(response.data.data.map(u => ({
+            id: u._id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            role: u.role,
+            status: u.status || (u.isVerified ? "active" : "pending"),
+            lastLogin: new Date(u.updatedAt).toLocaleString(),
+            tfa: u.twoFactorEnabled,
+            avatar: u.profilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.firstName}`
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to fetch users:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchConfig = async () => {
+        try {
+            const response = await api.get('/config');
+            if (response.data.success) {
+                const config = response.data.data;
+                if (config.maxLoginAttempts) setLoginAttempts(config.maxLoginAttempts);
+                if (config.lockoutDuration) setLockDuration(config.lockoutDuration);
+                if (config.senderEmail) setSenderEmail(config.senderEmail);
+                if (config.smtpHost) setSmtpHost(config.smtpHost);
+                if (config.smtpPort) setSmtpPort(config.smtpPort);
+                if (config.smtpUser) setSmtpUser(config.smtpUser);
+                if (config.smtpPass) setSmtpPass(config.smtpPass);
+            }
+        } catch (err) {
+            console.error("Failed to fetch config:", err);
+        }
+    };
+
+    fetchUsers();
+    fetchConfig();
+  }, []);
+
+  const updateConfig = async (configs) => {
+    setLoading(true);
+    try {
+        const response = await api.patch('/config', { configs });
+        if (response.data.success) {
+            toast.success("Settings updated successfully");
+        }
+    } catch (err) {
+        toast.error("Failed to update settings");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const testEmail = async () => {
+    toast.promise(
+        api.post('/config/test-email', { email: senderEmail }),
+        {
+            loading: 'Sending test email...',
+            success: 'Test email sent! Check your inbox.',
+            error: (err) => `Failed: ${err.response?.data?.message || 'Check console'}`
+        }
+    );
+  };
+
   const [deleteConfirm, setDeleteConfirm] = useState(null); // Stores account to delete
   const [editAccount, setEditAccount] = useState(null); // Stores account to edit
   const [editFormData, setEditFormData] = useState({ name: "", email: "", role: "" });
@@ -47,39 +127,54 @@ export default function SettingsPage() {
     { label: "User Logs",          value: mockActivityLogs.length, icon: <ScrollText className="w-5 h-5 text-blue-500" />, color: "bg-blue-50" },
   ];
 
-  const toggleSuspend = (id) => {
-    setAccounts(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      const next = a.status === "active" ? "suspended" : "active";
-      toast.success(`Account ${next === "suspended" ? "suspended" : "reactivated"}`, {
-        description: `${a.name}'s account is now ${next}.`,
+  const toggleSuspend = async (id) => {
+    try {
+      const account = accounts.find(a => a.id === id);
+      const nextStatus = account.status === "active" ? "suspended" : "active";
+      
+      const response = await api.patch(`/users/${id}`, {
+        status: nextStatus
       });
-      return { ...a, status: next };
-    }));
+
+      if (response.data.success) {
+        setAccounts(prev => prev.map(a => a.id === id ? { ...a, status: nextStatus } : a));
+        toast.success(`Account ${nextStatus === "suspended" ? "suspended" : "reactivated"}`);
+      }
+    } catch (err) {
+      toast.error("Action failed");
+    }
   };
 
-  const confirmDelete = (acc) => {
-    setDeleteConfirm(acc);
-  };
-
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (!deleteConfirm) return;
-    setAccounts(prev => prev.filter(a => a.id !== deleteConfirm.id));
-    toast.success("Account deleted successfully", { 
-      description: `${deleteConfirm.name}'s account has been permanently removed from the system.` 
-    });
-    setDeleteConfirm(null);
+    try {
+      const response = await api.delete(`/users/${deleteConfirm.id}`);
+      if (response.data.success) {
+        setAccounts(prev => prev.filter(a => a.id !== deleteConfirm.id));
+        toast.success("Account deleted successfully");
+        setDeleteConfirm(null);
+      }
+    } catch (err) {
+      toast.error("Deletion failed");
+    }
   };
 
-  const toggleTFA = (id) => {
-    setAccounts(prev => prev.map(a => {
-      if (a.id !== id) return a;
-      const next = !a.tfa;
-      toast.success(`2FA ${next ? "enabled" : "disabled"}`, { 
-        description: `${a.name}'s two-factor authentication is now ${next ? "on" : "off"}.` 
+  const toggleTFA = async (id) => {
+    try {
+      const account = accounts.find(a => a.id === id);
+      const nextTFA = !account.tfa;
+      
+      const response = await api.patch(`/users/${id}`, {
+        twoFactorEnabled: nextTFA
       });
-      return { ...a, tfa: next };
-    }));
+
+      if (response.data.success) {
+        setAccounts(prev => prev.map(a => a.id === id ? { ...a, tfa: nextTFA } : a));
+        toast.success(`2FA ${nextTFA ? "enabled" : "disabled"}`);
+      }
+    } catch (err) {
+      toast.error("Failed to toggle 2FA");
+    }
   };
 
   const handleEditClick = (acc) => {
@@ -87,10 +182,26 @@ export default function SettingsPage() {
     setEditFormData({ name: acc.name, email: acc.email, role: acc.role });
   };
 
-  const handleEditSave = () => {
-    setAccounts(prev => prev.map(a => a.id === editAccount.id ? { ...a, ...editFormData } : a));
-    toast.success("Account updated", { description: `${editFormData.name}'s information has been saved.` });
-    setEditAccount(null);
+  const handleEditSave = async () => {
+    try {
+      const [firstName, ...rest] = editFormData.name.split(" ");
+      const lastName = rest.join(" ");
+
+      const response = await api.patch(`/users/${editAccount.id}`, {
+        firstName,
+        lastName,
+        email: editFormData.email,
+        role: editFormData.role
+      });
+
+      if (response.data.success) {
+        setAccounts(prev => prev.map(a => a.id === editAccount.id ? { ...a, ...editFormData } : a));
+        toast.success("Account updated");
+        setEditAccount(null);
+      }
+    } catch (err) {
+      toast.error("Update failed");
+    }
   };
 
   const handleExportPDF = () => {
@@ -181,7 +292,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="pt-4 flex justify-end">
-                <Button onClick={() => toast.success("Security policies updated!")} className="bg-[var(--terra-navy)] text-white hover:bg-[#003d7a] px-8 rounded-xl h-11">Update Policies</Button>
+                <Button onClick={() => updateConfig({ maxLoginAttempts: loginAttempts, lockoutDuration: lockDuration })} className="bg-[var(--terra-navy)] text-white hover:bg-[#003d7a] px-8 rounded-xl h-11">Update Policies</Button>
               </div>
             </CardContent>
           </Card>
@@ -198,9 +309,45 @@ export default function SettingsPage() {
               <div className="space-y-4 max-w-xl">
                 <div className="space-y-2">
                   <Label htmlFor="authEmail">Sender Email Address</Label>
-                  <Input id="authEmail" type="email" placeholder="security@terratrace.cm" className="bg-white rounded-xl h-11" />
-                  <p className="text-[10px] text-muted-foreground">This email will be used to send authentication codes.</p>
+                  <Input id="authEmail" type="email" placeholder="security@terratrace.cm" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} className="bg-white rounded-xl h-11" />
+                  <p className="text-[10px] text-muted-foreground">This email will be used as the 'From' address.</p>
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed border-gray-200">
+                  <div className="space-y-2">
+                    <Label htmlFor="smtpHost">SMTP Host</Label>
+                    <Input id="smtpHost" placeholder="smtp.gmail.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} className="bg-white rounded-xl h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtpPort">SMTP Port</Label>
+                    <Input id="smtpPort" placeholder="587" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} className="bg-white rounded-xl h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtpUser">SMTP User</Label>
+                    <Input id="smtpUser" placeholder="your-email@gmail.com" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} className="bg-white rounded-xl h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="smtpPass">SMTP Password / App Secret</Label>
+                    <div className="relative">
+                      <Input 
+                        id="smtpPass" 
+                        type={showSmtpPass ? "text" : "password"} 
+                        placeholder="••••••••" 
+                        value={smtpPass} 
+                        onChange={(e) => setSmtpPass(e.target.value)} 
+                        className="bg-white rounded-xl h-11 pr-10" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPass(!showSmtpPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSmtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
                   <div className="flex gap-3">
                     <Mail className="w-5 h-5 text-emerald-600" />
@@ -212,8 +359,9 @@ export default function SettingsPage() {
                   <Badge className="bg-emerald-500 text-white border-none uppercase text-[10px] font-black">Active</Badge>
                 </div>
               </div>
-              <div className="pt-4 flex justify-end">
-                <Button onClick={() => toast.success("2FA configuration saved!")} className="bg-[var(--terra-navy)] text-white hover:bg-[#003d7a] px-8 rounded-xl h-11">Save Configuration</Button>
+              <div className="pt-4 flex justify-end gap-3">
+                <Button variant="outline" onClick={testEmail} className="rounded-xl h-11">Test Connection</Button>
+                <Button onClick={() => updateConfig({ senderEmail, smtpHost, smtpPort, smtpUser, smtpPass })} className="bg-[var(--terra-navy)] text-white hover:bg-[#003d7a] px-8 rounded-xl h-11">Save Configuration</Button>
               </div>
             </CardContent>
           </Card>

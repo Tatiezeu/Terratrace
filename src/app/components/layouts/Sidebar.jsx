@@ -24,61 +24,61 @@ const navItems = [
     label: "Dashboard",
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: "/dashboard",
-    roles: ["client", "landowner", "lro", "notary", "admin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
   },
   {
     label: "Land Plots",
     icon: <Map className="w-5 h-5" />,
     path: "/dashboard/land-plots",
-    roles: ["client", "landowner", "admin"],
+    roles: ["Client", "Landowner", "SuperAdmin"],
   },
   {
     label: "My Land Plots",
     icon: <MapPin className="w-5 h-5" />,
     path: "/dashboard/my-land-plots",
-    roles: ["landowner", "admin"],
+    roles: ["Landowner", "SuperAdmin"],
   },
   {
     label: "Registry Officer",
     icon: <ShieldCheck className="w-5 h-5" />,
     path: "/dashboard/lro",
-    roles: ["lro", "admin"],
+    roles: ["LRO", "SuperAdmin"],
   },
   {
     label: "Notary Officer",
     icon: <FileCheck className="w-5 h-5" />,
     path: "/dashboard/notary",
-    roles: ["notary", "admin"],
+    roles: ["Notary", "SuperAdmin"],
   },
   {
     label: "Officer Management",
     icon: <Users className="w-5 h-5" />,
     path: "/dashboard/admin",
-    roles: ["admin"],
+    roles: ["SuperAdmin"],
   },
   {
     label: "Notifications",
     icon: <Bell className="w-5 h-5" />,
     path: "/dashboard/notifications",
-    roles: ["client", "landowner", "lro", "notary", "admin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
   },
   {
     label: "Public Notices",
     icon: <Users className="w-5 h-5" />,
     path: "/dashboard/notices",
-    roles: ["client", "landowner", "lro", "notary", "admin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
   },
   {
     label: "Profile",
     icon: <UserIcon className="w-5 h-5" />,
     path: "/dashboard/profile",
-    roles: ["client", "landowner", "lro", "notary", "admin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
   },
   {
     label: "Settings",
     icon: <SettingsIcon className="w-5 h-5" />,
     path: "/dashboard/settings",
-    roles: ["admin"],
+    roles: ["SuperAdmin"],
   },
 ];
 
@@ -87,18 +87,20 @@ export function Sidebar({ user }) {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    localStorage.removeItem('token'); // Clear the JWT token
     navigate("/");
+    window.location.reload(); // Refresh to clear context state
   };
 
   const getRoleName = (role) => {
     const roleNames = {
-      client: "Client",
-      landowner: "Landowner",
-      lro: "Land Registry Officer",
-      notary: "Notary Officer",
-      admin: "Super Administrator",
+      Client: "Client",
+      Landowner: "Landowner",
+      LRO: "Land Registry Officer",
+      Notary: "Notary Officer",
+      SuperAdmin: "Super Administrator",
     };
-    return roleNames[role];
+    return roleNames[role] || role;
   };
 
   const visibleNavItems = navItems.filter((item) =>
@@ -162,7 +164,7 @@ export function Sidebar({ user }) {
         })}
 
         {/* System Cards in Sidebar (for Admin only, or specifically on Settings page context) */}
-        {user.role === "admin" && (
+        {user.role === "SuperAdmin" && (
           <div className="pt-8 pb-4 px-4 space-y-4">
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest px-2 mb-2">Live System Stats</p>
             <div className="grid grid-cols-2 gap-2">

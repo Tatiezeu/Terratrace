@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/c
 import { Search, Map as MapIcon, Filter, LayoutList, X, MapPin, User } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { LandCodeInfo } from "../app/components/shared/LandcodeInfo";
+import { useEffect } from "react";
+import api from "../utils/api";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +30,6 @@ const REGION_CODES = [
   { code: "09", name: "South", capital: "Ébolowa" },
   { code: "10", name: "South West", capital: "Buea" },
 ];
-
-const LOCATIONS = [...new Set(mockLandPlots.map((p) => p.location.split(",")[1]?.trim()).filter(Boolean))];
-
 export default function ClientDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLocation, setFilterLocation] = useState("all");
@@ -42,8 +41,28 @@ export default function ClientDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
+  const [plots, setPlots] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPlots = mockLandPlots.filter((plot) => {
+  useEffect(() => {
+    const fetchPlots = async () => {
+      try {
+        const response = await api.get('/land');
+        if (response.data.success) {
+          setPlots(response.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch plots:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlots();
+  }, []);
+
+  const LOCATIONS = [...new Set(plots.map((p) => p.location?.split(",")[1]?.trim()).filter(Boolean))];
+
+  const filteredPlots = plots.filter((plot) => {
     const q = searchQuery.toLowerCase();
     const matchSearch =
       !q ||
@@ -228,7 +247,7 @@ export default function ClientDashboard() {
 
             {/* Results count */}
             <p className="text-sm text-muted-foreground">
-              Showing <span className="font-bold text-foreground">{filteredPlots.length}</span> of {mockLandPlots.length} plots
+              Showing <span className="font-bold text-foreground">{filteredPlots.length}</span> of {plots.length} plots
             </p>
           </div>
 

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { 
   User, 
   Mail, 
@@ -19,39 +19,120 @@ import { Badge } from "../app/components/ui/badge";
 import { Input } from "../app/components/ui/input";
 import { Label } from "../app/components/ui/label";
 import { toast } from "sonner";
+import api from "../utils/api";
 
 export default function ProfilePage() {
   const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [profilePic, setProfilePic] = useState("https://api.dicebear.com/7.x/avataaars/svg?seed=John");
-  
+
   const [userData, setUserData] = useState({
-    name: "John Doe",
-    email: "john.doe@terratrace.cm",
-    phone: "+237 676 61 25 97",
-    role: "Property Owner",
-    location: "Yaoundé, Cameroon",
-    id: "TT-USR-2024-042",
-    twoFactorEnabled: true,
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    role: "",
+    cniNumber: "",
     accountStatus: "active"
   });
+
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmNewPassword: ""
+  });
+
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await api.get('/users/me');
+        if (response.data.success) {
+          const user = response.data.data;
+          setUserData(user);
+          if (user.profilePic) {
+            setProfilePic(user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:5001${user.profilePic}`);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch user:", err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfilePic(reader.result);
-        toast.success("Profile picture updated!");
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = () => {
-    toast.success("Profile updated successfully!");
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('firstName', userData.firstName);
+      formData.append('lastName', userData.lastName);
+      formData.append('phone', userData.phone);
+      if (selectedFile) {
+        formData.append('profilePic', selectedFile);
+      }
+
+      const response = await api.patch('/users/update-me', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if (response.data.success) {
+        toast.success("Profile updated successfully!");
+        setUserData(response.data.data);
+        setSelectedFile(null);
+        // Dispatch event to refresh navbar
+        window.dispatchEvent(new Event('auth-update'));
+      }
+    } catch (err) {
+      toast.error("Failed to update profile", {
+        description: err.response?.data?.message || "Something went wrong."
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwords.newPassword !== passwords.confirmNewPassword) {
+      return toast.error("Passwords do not match");
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.patch('/users/update-password', {
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword
+      });
+
+      if (response.data.success) {
+        toast.success("Password updated successfully!");
+        setPasswords({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
+      }
+    } catch (err) {
+      toast.error("Failed to update password", {
+        description: err.response?.data?.message || "Invalid current password."
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,7 +156,9 @@ export default function ProfilePage() {
               <div className="relative group">
                 <Avatar className="w-24 h-24 ring-4 ring-[var(--terra-emerald)]/20 transition-all group-hover:ring-[var(--terra-emerald)]/40">
                   <AvatarImage src={profilePic} />
-                  <AvatarFallback className="text-2xl font-bold">JD</AvatarFallback>
+                  <AvatarFallback className="text-2xl font-bold bg-[var(--terra-navy)] text-white">
+                    {userData.firstName && userData.lastName ? `${userData.firstName[0]}${userData.lastName[0]}`.toUpperCase() : "TT"}
+                  </AvatarFallback>
                 </Avatar>
                 <button 
                   onClick={() => fileInputRef.current?.click()}
@@ -106,26 +189,34 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input id="fullName" value={userData.name} onChange={(e) => setUserData({...userData, name: e.target.value})} className="h-11 bg-white rounded-xl" />
+                <Label htmlFor="firstName">First Name</Label>
+                <Input id="firstName" value={userData.firstName} onChange={(e) => setUserData({...userData, firstName: e.target.value})} className="h-11 bg-white rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input id="lastName" value={userData.lastName} onChange={(e) => setUserData({...userData, lastName: e.target.value})} className="h-11 bg-white rounded-xl" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" value={userData.email} onChange={(e) => setUserData({...userData, email: e.target.value})} className="h-11 bg-white rounded-xl" />
+                <Input id="email" type="email" value={userData.email} disabled className="h-11 bg-gray-50 rounded-xl opacity-70 cursor-not-allowed" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" value={userData.phone} onChange={(e) => setUserData({...userData, phone: e.target.value})} className="h-11 bg-white rounded-xl" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Region/Location</Label>
-                <Input id="location" value={userData.location} onChange={(e) => setUserData({...userData, location: e.target.value})} className="h-11 bg-white rounded-xl" />
+                <Label htmlFor="cniNumber">CNI Number</Label>
+                <Input id="cniNumber" value={userData.cniNumber} disabled className="h-11 bg-gray-50 rounded-xl opacity-70 cursor-not-allowed" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">User Role</Label>
+                <Input id="role" value={userData.role} disabled className="h-11 bg-gray-50 rounded-xl opacity-70 cursor-not-allowed" />
               </div>
             </div>
 
             <div className="pt-4 flex justify-end">
-              <Button onClick={handleSave} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 px-8 text-white h-11 rounded-xl shadow-lg shadow-emerald-500/10">
-                Save Changes
+              <Button onClick={handleSave} disabled={loading} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 px-8 text-white h-11 rounded-xl shadow-lg shadow-emerald-500/10">
+                {loading ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </CardContent>
@@ -179,6 +270,8 @@ export default function ProfilePage() {
                       type={showOldPassword ? "text" : "password"} 
                       placeholder="••••••••" 
                       className="h-10 bg-white rounded-xl pr-10" 
+                      value={passwords.currentPassword}
+                      onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
                     />
                     <button
                       type="button"
@@ -197,6 +290,8 @@ export default function ProfilePage() {
                       type={showNewPassword ? "text" : "password"} 
                       placeholder="••••••••" 
                       className="h-10 bg-white rounded-xl pr-10" 
+                      value={passwords.newPassword}
+                      onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
                     />
                     <button
                       type="button"
@@ -215,6 +310,8 @@ export default function ProfilePage() {
                       type={showConfirmPassword ? "text" : "password"} 
                       placeholder="••••••••" 
                       className="h-10 bg-white rounded-xl pr-10" 
+                      value={passwords.confirmNewPassword}
+                      onChange={(e) => setPasswords({...passwords, confirmNewPassword: e.target.value})}
                     />
                     <button
                       type="button"
@@ -228,10 +325,11 @@ export default function ProfilePage() {
               </div>
               <div className="flex justify-end">
                 <Button 
-                  onClick={() => toast.success("Password updated successfully!")}
+                  onClick={handleUpdatePassword}
+                  disabled={loading}
                   className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-6 h-10 rounded-xl"
                 >
-                  Update Password
+                  {loading ? "Updating..." : "Update Password"}
                 </Button>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
+import api from "../utils/api";
 import { 
   User, 
   Mail, 
@@ -13,7 +14,8 @@ import {
   Eye,
   EyeOff,
   Camera,
-  Users
+  Users,
+  CreditCard
 } from "lucide-react";
 import Logo from "../app/components/shared/Logo";
 import { Button } from "../app/components/ui/button";
@@ -33,6 +35,15 @@ export default function RegistrationPage() {
   
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    cniNumber: "",
+    gender: "",
+    dob: ""
+  });
 
   const getPasswordStrength = (pass) => {
     let strength = 0;
@@ -64,7 +75,7 @@ export default function RegistrationPage() {
     }
   };
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
@@ -83,14 +94,28 @@ export default function RegistrationPage() {
 
     setLoading(true);
     
-    // Simulate API call to send verification email
-    setTimeout(() => {
-      setLoading(false);
-      toast.info("Verification Code Sent", {
-        description: "Please check your email for the 6-digit code.",
+    try {
+      const response = await api.post('/auth/signup', {
+        ...formData,
+        password,
+        role: "Client" // Default role
       });
-      navigate("/verify-email");
-    }, 1500);
+
+      if (response.data.success) {
+        toast.success("Account created!", {
+          description: "Please check your email for the 6-digit code.",
+        });
+        // Store email for verification step
+        localStorage.setItem('temp_email', formData.email);
+        navigate("/verify-email");
+      }
+    } catch (err) {
+      toast.error("Registration failed", {
+        description: err.response?.data?.message || "Something went wrong. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -148,11 +173,23 @@ export default function RegistrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">First Name</Label>
-                <Input placeholder="John" className="h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" required />
+                <Input 
+                  placeholder="John" 
+                  className="h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  required 
+                />
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">Last Name</Label>
-                <Input placeholder="Doe" className="h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" required />
+                <Input 
+                  placeholder="Doe" 
+                  className="h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  required 
+                />
               </div>
             </div>
 
@@ -161,14 +198,40 @@ export default function RegistrationPage() {
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">Email Address</Label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input type="email" placeholder="john.doe@example.cm" className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" required />
+                  <Input 
+                    type="email" 
+                    placeholder="john.doe@example.cm" 
+                    className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required 
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">Phone Number</Label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input placeholder="+237 6XX XXX XXX" className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" required />
+                  <Input 
+                    placeholder="+237 6XX XXX XXX" 
+                    className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    required 
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">CNI Number</Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input 
+                    placeholder="123456789" 
+                    className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                    value={formData.cniNumber}
+                    onChange={(e) => setFormData({ ...formData, cniNumber: e.target.value })}
+                    required 
+                  />
                 </div>
               </div>
             </div>
@@ -176,7 +239,7 @@ export default function RegistrationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">Gender</Label>
-                <Select required>
+                <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })} required>
                   <SelectTrigger className="h-12 rounded-xl bg-gray-50 border-gray-100 font-medium">
                     <SelectValue placeholder="Select Gender" />
                   </SelectTrigger>
@@ -191,7 +254,13 @@ export default function RegistrationPage() {
                 <Label className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60 ml-1">Date of Birth</Label>
                 <div className="relative">
                   <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  <Input type="date" className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" required />
+                  <Input 
+                    type="date" 
+                    className="pl-11 h-12 rounded-xl bg-gray-50 border-gray-100 font-medium" 
+                    value={formData.dob}
+                    onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                    required 
+                  />
                 </div>
               </div>
             </div>

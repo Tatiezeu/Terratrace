@@ -7,6 +7,7 @@ import { cn } from "../ui/utils";
 const getStatusConfig = (status) => {
   switch (status) {
     case "clear":
+    case "cleared":
       return {
         label: "Clear",
         className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0",
@@ -42,7 +43,7 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
       {/* Image Container */}
       <div className="relative h-56 overflow-hidden bg-muted">
         <img
-          src={plot.image}
+          src={plot.coverImage?.startsWith('http') ? plot.coverImage : `http://localhost:5001${plot.coverImage || '/assets/images/plots/default-plot.jpg'}`}
           alt={plot.landCode}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
         />
@@ -120,7 +121,7 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
             See More
           </Button>
 
-          {plot.status === "clear" && onInitiateTransfer && (
+          {(plot.status === "clear" || plot.status === "cleared") && onInitiateTransfer && (
             <Button
               onClick={() => onInitiateTransfer(plot)}
               className="w-full bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white"

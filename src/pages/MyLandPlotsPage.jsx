@@ -3,16 +3,41 @@ import { mockLandPlots } from "../data/mockData";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
+import { useEffect, useMemo } from "react";
+import api from "../utils/api";
+import { useAuth } from "../context/AuthContext"; // Assuming AuthContext exists
 
 export default function MyLandPlotsPage() {
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
-  // In a real app, this would be filtered by the logged-in user's ID
-  const myPlots = mockLandPlots.filter(plot => 
-    plot.status === "under_transfer" || plot.landCode === "10005-D1-54321-001"
-  );
+  const { user } = useAuth();
+  const [plots, setPlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMyPlots = async () => {
+      try {
+        const response = await api.get('/land/my-plots');
+        if (response.data.success) {
+          setPlots(response.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch my plots:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMyPlots();
+  }, []);
+
+  // Filter based on land code owner segment as requested
+  const myPlots = useMemo(() => {
+    if (!user || !user.cniNumber) return plots;
+    const ownerId = user.cniNumber.slice(-5).padStart(5, '0');
+    return plots.filter(plot => plot.landCode.split('-')[2] === ownerId);
+  }, [plots, user]);
 
   const handleSeeMore = (plot) => {
     setSelectedPlot(plot);

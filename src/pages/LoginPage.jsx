@@ -18,6 +18,7 @@ import { Button } from "../app/components/ui/button";
 import { Input } from "../app/components/ui/input";
 import { Label } from "../app/components/ui/label";
 import { toast } from "sonner";
+import api from "../utils/api";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -26,18 +27,51 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     
-    // Simulate API call for credentials check
-    setTimeout(() => {
-      setLoading(false);
-      toast.info("Step 1 Complete", {
-        description: "Credentials verified. Please complete Two-Factor Authentication.",
+    try {
+      const response = await api.post('/auth/login', {
+        email,
+        password
       });
-      navigate("/verify-email?reason=2fa");
-    }, 1500);
+
+      if (response.data.success) {
+        if (response.data.twoFactorRequired) {
+          localStorage.setItem('temp_email', email);
+          toast.info("Two-Factor Authentication", {
+            description: "A verification code has been sent to your email.",
+          });
+          navigate("/verify-email?reason=2fa");
+          return;
+        }
+
+        // Store token and user data
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+
+        toast.success("Login Successful", {
+          description: `Welcome back, ${response.data.data.user.firstName}!`,
+        });
+        
+        window.location.href = "/dashboard";
+      }
+    } catch (err) {
+      if (err.response?.status === 401 && err.response?.data?.message?.includes("not verified")) {
+        localStorage.setItem('temp_email', email);
+        toast.info("Verification Required", {
+          description: "Please verify your email to continue.",
+        });
+        navigate("/verify-email");
+      } else {
+        toast.error("Login failed", {
+          description: err.response?.data?.message || "Invalid credentials.",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const features = [

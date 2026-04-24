@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
 import { Mail, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
+import api from "../utils/api";
 import Logo from "../app/components/shared/Logo";
 import { Button } from "../app/components/ui/button";
 import { Input } from "../app/components/ui/input";
@@ -37,7 +38,7 @@ export default function EmailVerificationPage() {
     }
   };
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
     const fullCode = code.join("");
     if (fullCode.length < 6) {
@@ -46,21 +47,33 @@ export default function EmailVerificationPage() {
     }
 
     setLoading(true);
-    // Simulate verification
-    setTimeout(() => {
-      setLoading(false);
-      if (reason === "2fa") {
-        toast.success("Security Check Passed", {
+    
+    try {
+      const email = localStorage.getItem('temp_email');
+      const response = await api.post('/auth/verify-email', {
+        email,
+        code: fullCode
+      });
+
+      if (response.data.success) {
+        // Store token and user data
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        localStorage.removeItem('temp_email');
+
+        toast.success("Verification Successful", {
           description: "Access granted to the TerraTrace Portal.",
         });
-        navigate("/dashboard");
-      } else {
-        toast.success("Email Verified Successfully", {
-          description: "Your account is now active. Please log in.",
-        });
-        navigate("/login");
+        
+        window.location.href = "/dashboard";
       }
-    }, 2000);
+    } catch (err) {
+      toast.error("Verification failed", {
+        description: err.response?.data?.message || "Invalid or expired code.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResend = () => {

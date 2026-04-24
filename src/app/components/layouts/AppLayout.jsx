@@ -1,15 +1,34 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopNav } from "./TopNav";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function AppLayout() {
-  // Mock user - in production this would come from auth context
+  const navigate = useNavigate();
+  const { user: rawUser, loading } = useAuth();
+  
   const [user, setUser] = useState({
-    role: "admin",
-    name: "Marie Kouadio",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Marie",
+    role: "loading...",
+    name: "User",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
   });
+
+  useEffect(() => {
+    if (!loading && !rawUser) {
+        navigate('/login');
+    }
+
+    if (rawUser) {
+      setUser({
+        role: rawUser.role,
+        name: `${rawUser.firstName} ${rawUser.lastName}`,
+        avatar: rawUser.profilePic 
+            ? (rawUser.profilePic.startsWith('http') ? rawUser.profilePic : `http://localhost:5001${rawUser.profilePic}`)
+            : `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`,
+      });
+    }
+  }, [rawUser, loading, navigate]);
 
   const handleRoleChange = (newRole) => {
     setUser((prev) => ({ ...prev, role: newRole }));

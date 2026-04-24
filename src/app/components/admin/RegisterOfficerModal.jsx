@@ -13,6 +13,7 @@ import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import api from "../../../utils/api";
 
 export function RegisterOfficerModal({
   open,
@@ -31,28 +32,50 @@ export function RegisterOfficerModal({
   });
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = () => {
-    const prefix = officerType === "lro" ? "CM" : "CH";
-    const fullMatricule = `${prefix}${formData.matricule}`;
+  const handleSubmit = async () => {
+    try {
+        const prefix = officerType === "lro" ? "CM" : "CH";
+        const fullMatricule = `${prefix}${formData.matricule}`;
+        const finalRole = officerType === "lro" ? "LRO" : "Notary";
 
-    toast.success(
-      `${officerType === "lro" ? "LRO" : "Notary"} Officer Registered!`,
-      {
-        description: `${formData.firstName} ${formData.lastName} (${fullMatricule}) has been added to the system.`,
-      }
-    );
+        const response = await api.post('/users/register-officer', {
+            ...formData,
+            role: finalRole,
+            matricule: fullMatricule,
+            jurisdiction: officerType === "lro" ? formData.region : formData.jurisdiction
+        });
 
-    onClose();
-    setFormData({
-      firstName: "",
-      lastName: "",
-      matricule: "",
-      region: "",
-      jurisdiction: "",
-      phone: "",
-      password: "",
-      email: "",
-    });
+        if (response.data.success) {
+            toast.success(
+              `${finalRole} Officer Registered!`,
+              {
+                description: `${formData.firstName} ${formData.lastName} (${fullMatricule}) has been added to the system.`,
+              }
+            );
+
+            onClose();
+            setFormData({
+              firstName: "",
+              lastName: "",
+              matricule: "",
+              region: "",
+              jurisdiction: "",
+              phone: "",
+              password: "",
+              email: "",
+            });
+            
+            // Refresh parent data if needed
+            if (window.refreshOfficerList) {
+                window.refreshOfficerList();
+            }
+        }
+    } catch (err) {
+        console.error("Officer registration failed:", err);
+        toast.error("Registration failed", {
+            description: err.response?.data?.message || "Internal server error"
+        });
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { mockLandPlots, mockOfficers } from "../data/mockData";
+import api from "../utils/api";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
@@ -23,14 +24,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-const ALL_LOCATIONS = ["All", ...new Set(mockLandPlots.map((p) => p.location.split(",")[1]?.trim() || p.location))];
-const MAX_PRICE = Math.max(...mockLandPlots.map((p) => p.price));
-const MIN_PRICE = 0;
-
 export default function LandPlotsPage() {
+  const [plots, setPlots] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("All");
-  const [priceRange, setPriceRange] = useState([MIN_PRICE, MAX_PRICE]);
+  const [priceRange, setPriceRange] = useState([0, 100000000]); // Temporary default
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,14 +37,35 @@ export default function LandPlotsPage() {
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
 
+  useEffect(() => {
+    const fetchPlots = async () => {
+      try {
+        const response = await api.get('/land');
+        if (response.data.success) {
+          setPlots(response.data.data);
+          // Update price range if plots exist
+          if (response.data.data.length > 0) {
+            const max = Math.max(...response.data.data.map(p => p.price));
+            setPriceRange([0, max]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch plots:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlots();
+  }, []);
+
   const filteredPlots = useMemo(() => {
-    return mockLandPlots.filter((plot) => {
+    return plots.filter((plot) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         !q ||
         plot.landCode.toLowerCase().includes(q) ||
         plot.location.toLowerCase().includes(q) ||
-        plot.owner.toLowerCase().includes(q);
+        (plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}`.toLowerCase().includes(q) : false);
 
       const matchesLocation =
         selectedLocation === "All" ||
@@ -56,7 +76,11 @@ export default function LandPlotsPage() {
 
       return matchesSearch && matchesLocation && matchesPrice;
     });
-  }, [searchQuery, selectedLocation, priceRange]);
+  }, [searchQuery, selectedLocation, priceRange, plots]);
+
+  const ALL_LOCATIONS = useMemo(() => ["All", ...new Set(plots.map((p) => p.location.split(",")[1]?.trim() || p.location))], [plots]);
+  const MAX_PRICE = useMemo(() => plots.length > 0 ? Math.max(...plots.map((p) => p.price)) : 100000000, [plots]);
+  const MIN_PRICE = 0;
 
   const activeFilterCount =
     (selectedLocation !== "All" ? 1 : 0) +
@@ -234,9 +258,8 @@ export default function LandPlotsPage() {
         </AnimatePresence>
 
         {/* Active filters summary */}
-        {(searchQuery || activeFilterCount > 0) && (
           <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-            <span>Showing <strong className="text-foreground">{filteredPlots.length}</strong> of {mockLandPlots.length} plots</span>
+            <span>Showing <strong className="text-foreground">{filteredPlots.length}</strong> of {plots.length} plots</span>
             {selectedLocation !== "All" && (
               <Badge variant="outline" className="gap-1">
                 <MapPin className="w-3 h-3" /> {selectedLocation}
@@ -250,7 +273,6 @@ export default function LandPlotsPage() {
               </Badge>
             )}
           </div>
-        )}
       </div>
 
       {/* Grid */}

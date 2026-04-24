@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "../ui/dialog";
+import { Eye, EyeOff, Camera, MapPin, FileText } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -18,6 +19,7 @@ import {
   SelectValue 
 } from "../ui/select";
 import { toast } from "sonner";
+import api from "../../../utils/api";
 import { mockOfficers } from "../../../data/mockData";
 
 export function RegisterLandownerModal({ open, onClose }) {
@@ -37,6 +39,10 @@ export function RegisterLandownerModal({ open, onClose }) {
     email: "",
     password: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [coverImage, setCoverImage] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const notaries = mockOfficers.filter(off => off.role === "Notary");
 
@@ -63,30 +69,65 @@ export function RegisterLandownerModal({ open, onClose }) {
     return `${typeCode}-${regionCode}-${ownerId}-${plotNum}`;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const landCode = generateLandCode();
     
-    toast.success("Landowner & Plot registered successfully!", {
-      description: `Generated Land Code: ${landCode}`,
-    });
-    
-    console.log("Registered Data:", { ...formData, landCode });
-    
-    onClose();
-    setFormData({
-      landType: "",
-      region: "",
-      plotSize: "",
-      matterportId: "",
-      landStatus: "Clear",
-      assignedNotary: "",
-      plotNumber: "",
-      fullName: "",
-      cni: "",
-      phone: "",
-      email: "",
-      password: "",
-    });
+    try {
+        const formDataToSend = new FormData();
+        
+        // Land Data
+        formDataToSend.append('landType', formData.landType === 'private' ? '10005' : '00050');
+        const regionObj = regions.find(r => r.name === formData.region);
+        formDataToSend.append('regionCode', regionObj ? regionObj.code : '05');
+        formDataToSend.append('plotNumber', formData.plotNumber);
+        formDataToSend.append('area', formData.plotSize);
+        formDataToSend.append('matterportId', formData.matterportId);
+        
+        // Owner Data
+        const nameParts = formData.fullName.split(' ');
+        formDataToSend.append('ownerFirstName', nameParts[0] || '');
+        formDataToSend.append('ownerLastName', nameParts.slice(1).join(' ') || '');
+        formDataToSend.append('ownerEmail', formData.email);
+        formDataToSend.append('ownerPhone', formData.phone);
+        formDataToSend.append('ownerCNI', formData.cni);
+        formDataToSend.append('ownerPassword', formData.password);
+        
+        if (coverImage) {
+            formDataToSend.append('coverImage', coverImage);
+        }
+
+        const response = await api.post('/land/register-all', formDataToSend, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        if (response.data.success) {
+            toast.success("Landowner & Plot registered successfully!", {
+                description: `Generated Land Code: ${landCode}`,
+            });
+            onClose();
+            setFormData({
+              landType: "",
+              region: "",
+              plotSize: "",
+              matterportId: "",
+              landStatus: "Clear",
+              assignedNotary: "",
+              plotNumber: "",
+              fullName: "",
+              cni: "",
+              phone: "",
+              email: "",
+              password: "",
+            });
+            setCoverImage(null);
+            setPreviewUrl(null);
+        }
+    } catch (err) {
+        console.error("Registration failed:", err);
+        toast.error("Registration failed", {
+            description: err.response?.data?.message || "Check your network"
+        });
+    }
   };
 
   return (
@@ -196,14 +237,32 @@ export function RegisterLandownerModal({ open, onClose }) {
                 </Select>
               </div>
 
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="plotNumber">Plot Number (Official Titre Foncier No.)</Label>
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="plotNumber">Plot Number (Official No.)</Label>
                 <Input
                   id="plotNumber"
                   value={formData.plotNumber}
                   onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
-                  placeholder="Official number from physical document"
+                  placeholder="Official number"
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-1">
+                <Label>Cover Image</Label>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-muted border border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0">
+                    {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" /> : <Camera className="w-5 h-5 text-muted-foreground" />}
+                  </div>
+                  <Input 
+                    type="file" 
+                    className="h-11 pt-2" 
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      setCoverImage(file);
+                      if (file) setPreviewUrl(URL.createObjectURL(file));
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -253,15 +312,25 @@ export function RegisterLandownerModal({ open, onClose }) {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Set account password"
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    placeholder="Set account password"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

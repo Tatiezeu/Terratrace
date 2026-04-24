@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import api from "../utils/api";
 import {
   Building2, MapPin, Users, FileCheck, Search, Bell,
   ArrowUpRight, CheckCircle2, XCircle, Clock, AlertTriangle,
@@ -28,26 +29,46 @@ export default function LRODashboard() {
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStatusFilter, setActiveStatusFilter] = useState(null);
+  const [plots, setPlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPlots = async () => {
+    try {
+        const response = await api.get('/land');
+        if (response.data.success) {
+            setPlots(response.data.data);
+        }
+    } catch (err) {
+        console.error("Failed to fetch plots:", err);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlots();
+  }, []);
 
   const filteredPlots = useMemo(() => {
-    return mockLandPlots.filter((plot) => {
+    return plots.filter((plot) => {
       const q = searchQuery.toLowerCase();
+      const ownerName = plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "";
       const matchesSearch =
         !q ||
         plot.landCode.toLowerCase().includes(q) ||
         plot.location.toLowerCase().includes(q) ||
-        plot.owner.toLowerCase().includes(q);
-      const matchesStatus = !activeStatusFilter || plot.status === activeStatusFilter;
+        ownerName.toLowerCase().includes(q);
+      const matchesStatus = !activeStatusFilter || plot.status === activeStatusFilter || (activeStatusFilter === 'clear' && plot.status === 'cleared');
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, activeStatusFilter]);
+  }, [searchQuery, activeStatusFilter, plots]);
 
   const statusCounts = useMemo(() => ({
-    clear:          mockLandPlots.filter(p => p.status === "clear").length,
-    disputed:       mockLandPlots.filter(p => p.status === "disputed").length,
-    under_transfer: mockLandPlots.filter(p => p.status === "under_transfer").length,
-    flagged:        mockLandPlots.filter(p => p.status === "flagged").length,
-  }), []);
+    clear:          plots.filter(p => p.status === "clear" || p.status === "cleared").length,
+    disputed:       plots.filter(p => p.status === "disputed").length,
+    under_transfer: plots.filter(p => p.status === "under_transfer").length,
+    flagged:        plots.filter(p => p.status === "flagged").length,
+  }), [plots]);
 
   const stats = [
     { label: "Pending Inspections",  value: "12",  icon: <Clock className="w-5 h-5 text-blue-500" />,    color: "blue" },
@@ -184,7 +205,7 @@ export default function LRODashboard() {
         </CardContent>
       </Card>
 
-      <RegisterLandownerModal open={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
+      <RegisterLandownerModal open={isRegisterOpen} onClose={() => { setIsRegisterOpen(false); fetchPlots(); }} />
       <PublishNoticeModal open={isPublishOpen} onClose={() => setIsPublishOpen(false)} />
       <LandApprovalModal open={isApprovalOpen} plot={selectedPlot} onClose={() => setIsApprovalOpen(false)} />
     </div>
@@ -202,14 +223,18 @@ function RegistryItem({ plot, onApprove }) {
     >
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden shrink-0">
-          <img src={plot.image} alt="" className="w-full h-full object-cover shadow-sm group-hover:scale-110 transition-transform" />
+          <img 
+            src={plot.coverImage?.startsWith('http') ? plot.coverImage : `http://localhost:5001${plot.coverImage || '/assets/images/plots/default-plot.jpg'}`} 
+            alt="" 
+            className="w-full h-full object-cover shadow-sm group-hover:scale-110 transition-transform" 
+          />
         </div>
         <div>
           <p className="font-bold font-mono text-sm group-hover:text-[var(--terra-emerald)] transition-colors">{plot.landCode}</p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
             <MapPin className="w-3 h-3" /> {plot.location}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">Owner: <span className="font-semibold text-foreground">{plot.owner}</span></p>
+          <p className="text-xs text-muted-foreground mt-0.5">Owner: <span className="font-semibold text-foreground">{plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "Unknown"}</span></p>
         </div>
       </div>
       <div className="flex items-center gap-6">

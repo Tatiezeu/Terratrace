@@ -78,9 +78,9 @@ export function LandPlotModal({ plot, open, onClose }) {
 
           <TabsContent value="details" className="space-y-6 mt-6">
             {/* Image */}
-            <div className="aspect-video rounded-lg overflow-hidden">
+            <div className="aspect-video rounded-lg overflow-hidden bg-muted">
               <img
-                src={plot.image}
+                src={plot.coverImage?.startsWith('http') ? plot.coverImage : `http://localhost:5001${plot.coverImage || '/assets/images/plots/default-plot.jpg'}`}
                 alt={plot.landCode}
                 className="w-full h-full object-cover"
               />
@@ -119,7 +119,9 @@ export function LandPlotModal({ plot, open, onClose }) {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Owner</p>
-                    <p className="text-lg font-semibold">{plot.owner}</p>
+                    <p className="text-lg font-semibold">
+                      {typeof plot.owner === 'object' ? `${plot.owner?.firstName} ${plot.owner?.lastName}` : (plot.owner || 'Unknown')}
+                    </p>
                   </div>
                 </div>
 
@@ -130,7 +132,7 @@ export function LandPlotModal({ plot, open, onClose }) {
                   <div>
                     <p className="text-sm text-muted-foreground">GPS Coordinates</p>
                     <p className="text-sm font-mono">
-                      {plot.gpsCoordinates.lat.toFixed(4)}, {plot.gpsCoordinates.lng.toFixed(4)}
+                      {plot.coordinates?.lat?.toFixed(4) || 0}, {plot.coordinates?.lng?.toFixed(4) || 0}
                     </p>
                   </div>
                 </div>
@@ -148,7 +150,7 @@ export function LandPlotModal({ plot, open, onClose }) {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-4 mt-6">
-            {plot.ownershipHistory.length > 0 ? (
+            {plot.ownershipHistory && plot.ownershipHistory.length > 0 ? (
               <div className="space-y-3">
                 {plot.ownershipHistory.map((record, index) => (
                   <div

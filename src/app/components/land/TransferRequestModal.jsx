@@ -113,7 +113,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
         <DialogHeader>
           <DialogTitle className="text-xl font-bold font-['Syne']">Initiate Land Transfer</DialogTitle>
           <DialogDescription className="font-mono text-[var(--terra-navy)]">
-            Plot: {plot.landCode} · {plot.location}
+            Plot: {plot.landCode} {plot.location ? `· ${plot.location}` : ""}
           </DialogDescription>
         </DialogHeader>
 

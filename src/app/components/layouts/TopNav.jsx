@@ -4,7 +4,6 @@ import { useTheme } from "next-themes";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { motion } from "motion/react";
-import { RoleSwitcher } from "./RoleSwitcher";
 import { Button } from "../ui/button";
 import { 
   Popover,
@@ -61,8 +60,6 @@ export function TopNav({ user, onRoleChange }) {
       className="h-20 bg-white/80 dark:bg-[#001529]/90 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-50 transition-colors"
     >
       <div className="flex items-center gap-6">
-        <RoleSwitcher currentRole={user.role} onRoleChange={onRoleChange} />
-
         {/* Live Clock */}
         <div className="hidden md:flex flex-col">
           <span className="text-xl font-bold font-['Syne'] text-[var(--terra-navy)] dark:text-white">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,38 +11,61 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { CheckCircle2, Upload, Send, ArrowRight, Check, FileText, ExternalLink } from "lucide-react";
+import { CheckCircle2, Upload, Send, ArrowRight, Check, FileText, ExternalLink, Download, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import { mockTransferRequests, mockLandPlots } from "../../../data/mockData";
 
-const UploadItem = ({ label, fieldKey, file, onChange }) => (
+const UploadItem = ({ label, fieldKey, files, onChange, onRemove }) => (
   <div className="space-y-1.5">
     <Label className="text-xs font-semibold">{label}</Label>
-    <label
-      htmlFor={fieldKey}
-      className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-colors text-sm ${
-        file ? "border-[var(--terra-emerald)] bg-emerald-50/50" : "border-border hover:border-muted-foreground"
-      }`}
-    >
-      {file ? (
-        <><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /><span className="text-emerald-700 font-medium truncate">{file.name}</span></>
-      ) : (
-        <><Upload className="w-4 h-4 text-muted-foreground shrink-0" /><span className="text-muted-foreground">Upload document</span></>
-      )}
-    </label>
-    <input id={fieldKey} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => onChange(e.target.files?.[0] || null)} />
+    <div className="space-y-2">
+      {files && files.map((file, idx) => (
+        <div key={idx} className="flex items-center gap-3 px-4 py-2 border border-[var(--terra-emerald)] bg-emerald-50/50 rounded-xl text-sm animate-in fade-in slide-in-from-left-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="text-emerald-700 font-medium truncate flex-1">{file.name}</span>
+          <button onClick={() => onRemove(idx)} className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      <label
+        htmlFor={fieldKey}
+        className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-muted-foreground transition-colors text-sm"
+      >
+        <Plus className="w-4 h-4 text-muted-foreground shrink-0" />
+        <span className="text-muted-foreground">Add {files && files.length > 0 ? "another" : "document"}</span>
+      </label>
+    </div>
+    <input 
+      id={fieldKey} 
+      type="file" 
+      className="hidden" 
+      accept=".pdf,.jpg,.jpeg,.png" 
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) onChange(file);
+        e.target.value = ""; // Reset to allow adding same file again if needed
+      }} 
+    />
   </div>
 );
 
-export function VerificationModal({ requestId, open, onClose }) {
-  const [step, setStep] = useState(1);
+export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
+  const [step, setStep] = useState(startStep);
   const [matterportId, setMatterportId] = useState("");
-  const [buyerDocs, setBuyerDocs] = useState(null);
+  const [buyerDocs, setBuyerDocs] = useState([]);
   const [feeNote, setFeeNote] = useState("Please pay the land transfer processing fee of 150,000 XAF via the platform payment portal. Attach your payment receipt to unlock forwarding to the LRO.");
   const [done, setDone] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState("");
+
+  // Sync step with startStep when modal opens
+  useEffect(() => {
+    if (open) {
+      setStep(startStep);
+    }
+  }, [open, startStep]);
 
   const request = mockTransferRequests.find((r) => r.id === requestId);
   const plot = request ? mockLandPlots.find((p) => p.landCode === request?.landCode) : null;
@@ -67,11 +90,30 @@ export function VerificationModal({ requestId, open, onClose }) {
   };
 
   const handleClose = () => {
-    setStep(1);
+    setStep(startStep);
     setMatterportId("");
-    setBuyerDocs(null);
+    setBuyerDocs([]);
     setDone(false);
     onClose();
+  };
+
+  const handleAddBuyerDoc = (file) => {
+    setBuyerDocs(prev => [...prev, file]);
+  };
+
+  const handleRemoveBuyerDoc = (index) => {
+    setBuyerDocs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDownloadDoc = (doc) => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+      {
+        loading: `Preparing ${doc} for download...`,
+        success: `${doc} downloaded successfully as PDF!`,
+        error: 'Failed to download document.',
+      }
+    );
   };
 
   const handleViewDoc = (doc) => {
@@ -134,6 +176,7 @@ export function VerificationModal({ requestId, open, onClose }) {
                 <div className="bg-muted/40 rounded-xl p-4 space-y-2 text-sm border">
                   <div className="flex justify-between"><span className="text-muted-foreground">Land Code</span><span className="font-mono font-bold">{request.landCode}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{plot.location}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Current Owner</span><span className="font-semibold text-amber-700">{plot.owner}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Buyer</span><span className="font-semibold">{request.buyerName}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">CNI</span><span>{request.buyerCNI}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="capitalize font-medium">{request.transferType}</span></div>
@@ -143,7 +186,12 @@ export function VerificationModal({ requestId, open, onClose }) {
                     <div key={doc} className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/50 border-emerald-200 group">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                       <span className="text-sm font-medium">{doc}</span>
-                      <Button variant="ghost" size="sm" className="ml-auto text-xs h-7 hover:bg-emerald-100" onClick={() => handleViewDoc(doc)}>View</Button>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button variant="ghost" size="sm" className="text-xs h-7 hover:bg-emerald-100" onClick={() => handleViewDoc(doc)}>View</Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-emerald-100 text-emerald-600" onClick={() => handleDownloadDoc(doc)}>
+                          <Download className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -155,10 +203,11 @@ export function VerificationModal({ requestId, open, onClose }) {
               <motion.div key="v2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                 <p className="text-xs text-muted-foreground">Upload the buyer's supporting documents and link the Matterport ID for the plot.</p>
                 <UploadItem
-                  label="Buyer's Compiled Documents"
+                  label="Buyer's Compiled Documents (CNI, Deed of Sale, etc.)"
                   fieldKey="buyerDocsUpload"
-                  file={buyerDocs}
-                  onChange={setBuyerDocs}
+                  files={buyerDocs}
+                  onChange={handleAddBuyerDoc}
+                  onRemove={handleRemoveBuyerDoc}
                 />
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Matterport ID (360° Scan)</Label>
@@ -226,7 +275,7 @@ export function VerificationModal({ requestId, open, onClose }) {
               </Button>
             )}
             {step === 2 && (
-              <Button onClick={() => setStep(3)} disabled={!buyerDocs} className="bg-[var(--terra-navy)] text-white gap-2 flex-1">
+              <Button onClick={() => setStep(3)} disabled={buyerDocs.length === 0} className="bg-[var(--terra-navy)] text-white gap-2 flex-1">
                 Next <ArrowRight className="w-4 h-4" />
               </Button>
             )}

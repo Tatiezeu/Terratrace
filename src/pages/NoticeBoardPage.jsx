@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   MapPin, Calendar, Clock, Search, Filter, AlertCircle,
-  ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send
+  ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send, Eye, Timer
 } from "lucide-react";
 import { Card, CardContent } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -32,6 +32,7 @@ export default function NoticeBoardPage() {
   const [objectionOpen, setObjectionOpen] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [objectionMsg, setObjectionMsg] = useState("");
+  const [countdownOpen, setCountdownOpen] = useState(false);
 
   const filteredNotices = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -53,6 +54,11 @@ export default function NoticeBoardPage() {
     setSelectedNotice(notice);
     setObjectionMsg(`Dear LRO ${notice.lroName},\n\nI write to formally contest the land transfer notice (Plot: ${notice.landCode}) published on ${notice.publishedAt} on the TerraTrace platform.\n\nMy objection is based on the following grounds:\n[Please describe your objection here]\n\nI request that this matter be reviewed before any transfer is finalized.\n\nRespectfully,\n[Your Full Name]\n[CNI Number]\n[Contact]`);
     setObjectionOpen(true);
+  };
+
+  const openCountdown = (notice) => {
+    setSelectedNotice(notice);
+    setCountdownOpen(true);
   };
 
   const handleSendObjection = () => {
@@ -192,22 +198,34 @@ export default function NoticeBoardPage() {
                     </div>
                   </div>
 
-                  <div className="pt-5 mt-auto flex items-center justify-between border-t">
+                  <div className="pt-5 mt-auto flex items-center justify-between border-t gap-2">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                       </div>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase">Certified Notice</span>
                     </div>
-                    {notice.status === "active" && (
-                      <Button
-                        variant="ghost"
-                        className="text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => openObjection(notice)}
-                      >
-                        File Objection <ArrowRight className="w-3 h-3" />
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {notice.status === "active" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          onClick={() => openCountdown(notice)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {notice.status === "active" && (
+                        <Button
+                          variant="ghost"
+                          className="text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
+                          onClick={() => openObjection(notice)}
+                        >
+                          File Objection <ArrowRight className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -264,6 +282,49 @@ export default function NoticeBoardPage() {
               <Send className="w-4 h-4" /> Submit Objection
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Countdown Dialog */}
+      <Dialog open={countdownOpen} onOpenChange={setCountdownOpen}>
+        <DialogContent className="max-w-md p-8">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="font-['Syne'] text-center text-2xl">Notice Period</DialogTitle>
+            <DialogDescription className="text-center">
+              Time remaining for public opposition of Plot {selectedNotice?.landCode}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col items-center justify-center space-y-8 py-4">
+            <div className="relative w-48 h-48 flex items-center justify-center">
+              <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/10" />
+                <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="289" strokeDashoffset="80" strokeLinecap="round" className="text-[var(--terra-emerald)] transition-all duration-1000" />
+              </svg>
+              <div className="flex flex-col items-center animate-pulse">
+                <Timer className="w-6 h-6 text-[var(--terra-emerald)] mb-1" />
+                <span className="text-4xl font-black text-[#002147]">18</span>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Days Left</span>
+              </div>
+            </div>
+
+            <div className="w-full space-y-4">
+              <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <span>Published: {selectedNotice?.publishedAt}</span>
+                <span>Expires: {selectedNotice?.expiresAt}</span>
+              </div>
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-[var(--terra-emerald)] w-[60%]" />
+              </div>
+              <p className="text-xs text-center text-muted-foreground italic">
+                Any objections must be filed before the countdown reaches zero.
+              </p>
+            </div>
+          </div>
+
+          <Button onClick={() => setCountdownOpen(false)} className="w-full bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white h-12 rounded-xl text-sm font-bold uppercase tracking-widest">
+            Close View
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

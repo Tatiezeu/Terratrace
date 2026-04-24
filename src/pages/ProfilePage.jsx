@@ -8,7 +8,9 @@ import {
   Lock,
   BadgeCheck,
   Camera,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -25,13 +27,16 @@ export default function ProfilePage() {
   const [userData, setUserData] = useState({
     name: "John Doe",
     email: "john.doe@terratrace.cm",
-    phone: "+237 600 000 000",
+    phone: "+237 676 61 25 97",
     role: "Property Owner",
     location: "Yaoundé, Cameroon",
     id: "TT-USR-2024-042",
     twoFactorEnabled: true,
     accountStatus: "active"
   });
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -158,6 +163,77 @@ export default function ProfilePage() {
               <Badge className="bg-emerald-500 text-white border-none px-4 py-1.5 uppercase tracking-wider text-[10px] font-bold rounded-full">
                 {userData.accountStatus}
               </Badge>
+            </div>
+
+            <div className="pt-6 border-t border-border space-y-4">
+              <p className="font-bold font-['Syne'] text-sm flex items-center gap-2">
+                <Lock className="w-4 h-4 text-[var(--terra-emerald)]" />
+                Change Password
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="oldPassword">Old Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="oldPassword" 
+                      type={showOldPassword ? "text" : "password"} 
+                      placeholder="••••••••" 
+                      className="h-10 bg-white rounded-xl pr-10" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="newPassword" 
+                      type={showNewPassword ? "text" : "password"} 
+                      placeholder="••••••••" 
+                      className="h-10 bg-white rounded-xl pr-10" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="confirmNewPassword" 
+                      type={showConfirmPassword ? "text" : "password"} 
+                      placeholder="••••••••" 
+                      className="h-10 bg-white rounded-xl pr-10" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={() => toast.success("Password updated successfully!")}
+                  className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-6 h-10 rounded-xl"
+                >
+                  Update Password
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

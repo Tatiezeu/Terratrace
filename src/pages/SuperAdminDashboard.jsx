@@ -17,6 +17,7 @@ export default function SuperAdminDashboard() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [officerType, setOfficerType] = useState("lro");
   const [officerSearch, setOfficerSearch] = useState("");
+  const [showAllLogs, setShowAllLogs] = useState(false);
 
   const lroCount    = mockOfficers.filter(o => o.role === "LRO").length;
   const notaryCount = mockOfficers.filter(o => o.role === "Notary").length;
@@ -26,7 +27,7 @@ export default function SuperAdminDashboard() {
     { label: "Total LRO Officers",    value: lroCount,    icon: <Building className="w-5 h-5 text-blue-500" />,    change: "+2 this month" },
     { label: "Total Notary Officers", value: notaryCount, icon: <Gavel className="w-5 h-5 text-purple-500" />,     change: "+1 this month" },
     { label: "Total Users",           value: totalUsers,  icon: <Users className="w-5 h-5 text-emerald-500" />,    change: "+12%" },
-    { label: "Security Alerts",       value: "0",         icon: <ShieldAlert className="w-5 h-5 text-red-400" />, change: "All Clear" },
+    { label: "Log Activity",          value: mockActivityLogs.length, icon: <Activity className="w-5 h-5 text-blue-400" />, change: "Last 24h" },
   ];
 
   const filteredOfficers = useMemo(() => {
@@ -173,8 +174,8 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {mockActivityLogs.slice(0, 6).map((log) => (
-                  <div key={log.id} className="flex gap-3 group">
+                {(showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 6)).map((log) => (
+                  <div key={log.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
                     <div className={`w-1 rounded-full shrink-0 h-12 ${log.status === "success" ? "bg-emerald-500" : log.status === "failed" ? "bg-red-400" : "bg-amber-400"}`} />
                     <div className="min-w-0">
                       <p className="text-sm font-bold truncate">{log.action}</p>
@@ -183,8 +184,12 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
                 ))}
-                <Button variant="outline" className="w-full text-xs font-bold uppercase tracking-widest gap-2">
-                  View Full Logs <ArrowUpRight className="w-3 h-3" />
+                <Button 
+                  variant="outline" 
+                  className="w-full text-xs font-bold uppercase tracking-widest gap-2"
+                  onClick={() => setShowAllLogs(!showAllLogs)}
+                >
+                  {showAllLogs ? "View Less Logs" : "View Full Logs"} <ArrowUpRight className={`w-3 h-3 transition-transform ${showAllLogs ? "rotate-180" : ""}`} />
                 </Button>
               </div>
             </CardContent>

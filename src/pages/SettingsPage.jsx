@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   ShieldAlert, Mail, Users, History, Lock, CircleAlert,
   Smartphone, Database, Activity, ScrollText, Ban, Trash2,
-  CheckCircle2, UserCheck, UserX, X, AlertTriangle
+  CheckCircle2, UserCheck, UserX, X, AlertTriangle, Edit, Download, User
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -32,6 +32,8 @@ export default function SettingsPage() {
   const [noticeTestMinutes, setNoticeTestMinutes] = useState(10);
   const [accounts, setAccounts] = useState(mockSystemAccounts);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // Stores account to delete
+  const [editAccount, setEditAccount] = useState(null); // Stores account to edit
+  const [editFormData, setEditFormData] = useState({ name: "", email: "", role: "" });
 
   // System stats derived from accounts
   const activeCount    = accounts.filter(a => a.status === "active").length;
@@ -73,9 +75,33 @@ export default function SettingsPage() {
     setAccounts(prev => prev.map(a => {
       if (a.id !== id) return a;
       const next = !a.tfa;
-      toast.success(`2FA ${next ? "enabled" : "disabled"}`, { description: `${a.name}'s two-factor authentication is now ${next ? "on" : "off"}.` });
+      toast.success(`2FA ${next ? "enabled" : "disabled"}`, { 
+        description: `${a.name}'s two-factor authentication is now ${next ? "on" : "off"}.` 
+      });
       return { ...a, tfa: next };
     }));
+  };
+
+  const handleEditClick = (acc) => {
+    setEditAccount(acc);
+    setEditFormData({ name: acc.name, email: acc.email, role: acc.role });
+  };
+
+  const handleEditSave = () => {
+    setAccounts(prev => prev.map(a => a.id === editAccount.id ? { ...a, ...editFormData } : a));
+    toast.success("Account updated", { description: `${editFormData.name}'s information has been saved.` });
+    setEditAccount(null);
+  };
+
+  const handleExportPDF = () => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+      {
+        loading: 'Generating PDF Registry...',
+        success: 'PDF Registry exported successfully!',
+        error: 'Failed to export registry.',
+      }
+    );
   };
 
   return (
@@ -203,7 +229,14 @@ export default function SettingsPage() {
                   {activeCount} active · {suspendedCount} suspended · {totalCount} total
                 </CardDescription>
               </div>
-              <Button size="sm" variant="outline" className="rounded-lg h-9 font-bold text-xs">Export Registry</Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="rounded-lg h-9 font-bold text-xs gap-2"
+                onClick={handleExportPDF}
+              >
+                <Download className="w-3.5 h-3.5" /> Export PDF Registry
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -257,6 +290,12 @@ export default function SettingsPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleEditClick(acc)}
+                              className="p-2 rounded-xl text-blue-500 bg-blue-50 hover:bg-blue-100 transition-all"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => toggleSuspend(acc.id)}
                               className={`p-2 rounded-xl transition-all ${
@@ -426,6 +465,61 @@ export default function SettingsPage() {
             <Button variant="ghost" onClick={() => setDeleteConfirm(null)} className="flex-1 rounded-xl h-11">No, Keep Account</Button>
             <Button onClick={executeDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
               Yes, Delete Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT ACCOUNT DIALOG */}
+      <Dialog open={!!editAccount} onOpenChange={() => setEditAccount(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-['Syne'] text-xl flex items-center gap-2">
+              <User className="w-5 h-5 text-[var(--terra-emerald)]" />
+              Edit Account Info
+            </DialogTitle>
+            <DialogDescription>Update system user information and role.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editName">Full Name</Label>
+              <Input 
+                id="editName" 
+                value={editFormData.name} 
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} 
+                className="rounded-xl h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editEmail">Email Address</Label>
+              <Input 
+                id="editEmail" 
+                type="email" 
+                value={editFormData.email} 
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })} 
+                className="rounded-xl h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editRole">System Role</Label>
+              <select 
+                id="editRole"
+                value={editFormData.role}
+                onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm"
+              >
+                <option value="Super Admin">Super Admin</option>
+                <option value="Notary">Notary</option>
+                <option value="LRO">LRO</option>
+                <option value="Landowner">Landowner</option>
+                <option value="Client">Client</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditAccount(null)} className="rounded-xl h-11">Cancel</Button>
+            <Button onClick={handleEditSave} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white rounded-xl h-11 px-8">
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

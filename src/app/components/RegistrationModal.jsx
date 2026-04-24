@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, CheckCircle2, Mail } from 'lucide-react';
+import { X, Upload, CheckCircle2, Mail, Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 export default function RegistrationModal({ isOpen, onClose }) {
@@ -12,6 +12,9 @@ export default function RegistrationModal({ isOpen, onClose }) {
     watch,
     formState: { errors },
   } = useForm();
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const password = watch('password');
 
@@ -263,19 +266,28 @@ export default function RegistrationModal({ isOpen, onClose }) {
                         <label htmlFor="password" className="block text-[#002147] mb-2">
                           Password *
                         </label>
-                        <input
-                          type="password"
-                          id="password"
-                          {...register('password', {
-                            required: 'Password is required',
-                            minLength: {
-                              value: 8,
-                              message: 'Password must be at least 8 characters',
-                            },
-                          })}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
-                          placeholder="••••••••"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            id="password"
+                            {...register('password', {
+                              required: 'Password is required',
+                              minLength: {
+                                value: 8,
+                                message: 'Password must be at least 8 characters',
+                              },
+                            })}
+                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300 pr-12"
+                            placeholder="••••••••"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
                         {errors.password && (
                           <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
                         )}
@@ -285,16 +297,25 @@ export default function RegistrationModal({ isOpen, onClose }) {
                         <label htmlFor="confirmPassword" className="block text-[#002147] mb-2">
                           Confirm Password *
                         </label>
-                        <input
-                          type="password"
-                          id="confirmPassword"
-                          {...register('confirmPassword', {
-                            required: 'Please confirm your password',
-                            validate: (value) => value === password || 'Passwords do not match',
-                          })}
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
-                          placeholder="••••••••"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            id="confirmPassword"
+                            {...register('confirmPassword', {
+                              required: 'Please confirm your password',
+                              validate: (value) => value === password || 'Passwords do not match',
+                            })}
+                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300 pr-12"
+                            placeholder="••••••••"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
                         {errors.confirmPassword && (
                           <p className="text-red-500 text-sm mt-1">{errors.confirmPassword.message}</p>
                         )}

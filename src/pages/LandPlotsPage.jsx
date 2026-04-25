@@ -65,7 +65,7 @@ export default function LandPlotsPage() {
         !q ||
         plot.landCode.toLowerCase().includes(q) ||
         plot.location.toLowerCase().includes(q) ||
-        (plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}`.toLowerCase().includes(q) : false);
+        (plot.landType === '00050' ? 'government of cameroon'.includes(q) : (plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}`.toLowerCase().includes(q) : false));
 
       const matchesLocation =
         selectedLocation === "All" ||

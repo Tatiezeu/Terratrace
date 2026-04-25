@@ -1,8 +1,9 @@
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { MapPin, Shield, Eye } from "lucide-react";
+import { MapPin, Shield, Eye, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../ui/utils";
+import { useAuth } from "../../../context/AuthContext";
 
 const getStatusConfig = (status) => {
   switch (status) {
@@ -22,6 +23,11 @@ const getStatusConfig = (status) => {
         label: "Disputed",
         className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0",
       };
+    case "flagged":
+      return {
+        label: "Flagged (State Land)",
+        className: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0",
+      };
     default:
         return {
             label: status,
@@ -31,7 +37,15 @@ const getStatusConfig = (status) => {
 };
 
 export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 }) {
+  const { user } = useAuth();
   const statusConfig = getStatusConfig(plot.status);
+
+  const isOwner = user && (
+    plot.owner?._id === user._id || 
+    plot.owner === user._id || 
+    (user.role === 'SuperAdmin' && plot.landCode.split('-')[2] === '00000')
+  );
+  const isPublic = plot.landType === "00050";
 
   return (
     <motion.div
@@ -121,12 +135,22 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
             See More
           </Button>
 
-          {(plot.status === "clear" || plot.status === "cleared") && onInitiateTransfer && (
+          {(plot.status === "clear" || plot.status === "cleared" || plot.status === "flagged") && onInitiateTransfer && (
             <Button
               onClick={() => onInitiateTransfer(plot)}
-              className="w-full bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white"
+              disabled={isOwner}
+              className={cn(
+                "w-full text-white transition-all",
+                isPublic 
+                  ? "bg-[var(--terra-navy)] hover:bg-blue-900" 
+                  : "bg-[var(--terra-emerald)] hover:bg-emerald-600"
+              )}
             >
-              Initiate Transfer
+              {isOwner ? (
+                <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Your Property</span>
+              ) : (
+                isPublic ? "Direct Grant" : "Initiate Transfer"
+              )}
             </Button>
           )}
 

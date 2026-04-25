@@ -47,15 +47,17 @@ export default function LoginPage() {
           return;
         }
 
-        // Store token and user data
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
-
-        toast.success("Login Successful", {
-          description: `Welcome back, ${response.data.data.user.firstName}!`,
-        });
-        
-        window.location.href = "/dashboard";
+        const userData = response.data.data?.user || response.data.data;
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(userData));
+        if (userData?.firstName) {
+          toast.success("Login Successful", {
+            description: `Welcome back, ${userData.firstName}!`,
+          });
+        }
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 300);
       }
     } catch (err) {
       if (err.response?.status === 401 && err.response?.data?.message?.includes("not verified")) {

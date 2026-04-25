@@ -88,11 +88,7 @@ export default function ProfilePage() {
         formData.append('profilePic', selectedFile);
       }
 
-      const response = await api.patch('/users/update-me', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await api.patch("/users/update-me", formData);
 
       if (response.data.success) {
         toast.success("Profile updated successfully!");

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/c
 import { Search, Map as MapIcon, Filter, LayoutList, X, MapPin, User } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { LandCodeInfo } from "../app/components/shared/LandcodeInfo";
+import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
 import { useEffect } from "react";
 import api from "../utils/api";
 import {
@@ -41,6 +42,7 @@ export default function ClientDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [plots, setPlots] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,6 +93,11 @@ export default function ClientDashboard() {
   const handleView360 = (plot) => {
     setMatterportPlot(plot);
     setIs360Open(true);
+  };
+
+  const handleInitiateTransfer = (plot) => {
+    setSelectedPlot(plot);
+    setIsTransferOpen(true);
   };
 
   const clearFilters = () => {
@@ -260,6 +267,7 @@ export default function ClientDashboard() {
                   plot={plot}
                   onSeeMore={handleSeeMore}
                   onView360={handleView360}
+                  onInitiateTransfer={handleInitiateTransfer}
                 />
               ))}
             </div>

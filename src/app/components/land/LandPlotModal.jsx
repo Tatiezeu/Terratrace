@@ -6,7 +6,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
-import { MapPin, Calendar, User, Ruler, DollarSign } from "lucide-react";
+import { MapPin, Calendar, User, Ruler, DollarSign, Database } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { TransferStatusPipeline } from "../transfer/TransferStatusPipeline";
 import { BlockchainBadge } from "../shared/BlockchainBadge";
@@ -120,7 +120,19 @@ export function LandPlotModal({ plot, open, onClose }) {
                   <div>
                     <p className="text-sm text-muted-foreground">Current Owner</p>
                     <p className="text-lg font-semibold">
-                      {typeof plot.owner === 'object' ? `${plot.owner?.firstName} ${plot.owner?.lastName}` : (plot.owner || 'Unknown')}
+                      {plot.landType === '00050' ? 'Government of Cameroon' : (typeof plot.owner === 'object' ? `${plot.owner?.firstName} ${plot.owner?.lastName}` : (plot.owner || 'Unknown'))}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-[var(--terra-navy)]/10">
+                    <Database className="w-5 h-5 text-[var(--terra-navy)] dark:text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Land Category</p>
+                    <p className="text-lg font-semibold">
+                      {plot.landType === '00050' ? 'Public (State Land)' : 'Private Land'}
                     </p>
                   </div>
                 </div>

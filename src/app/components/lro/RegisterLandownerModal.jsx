@@ -63,7 +63,7 @@ export function RegisterLandownerModal({ open, onClose }) {
     const typeCode = formData.landType === "private" ? "10005" : "00050";
     const regionObj = regions.find(r => r.name === formData.region);
     const regionCode = regionObj ? regionObj.code : "00";
-    const ownerId = formData.cni.slice(-5).padStart(5, "0");
+    const ownerId = formData.landType === "public" ? "00000" : (formData.cni.slice(-5).padStart(5, "0"));
     const plotNum = formData.plotNumber;
 
     return `${typeCode}-${regionCode}-${ownerId}-${plotNum}`;
@@ -150,7 +150,18 @@ export function RegisterLandownerModal({ open, onClose }) {
               <div className="space-y-2">
                 <Label htmlFor="landType">Land Type</Label>
                 <Select 
-                  onValueChange={(value) => setFormData({ ...formData, landType: value })}
+                  onValueChange={(value) => {
+                    const updates = { landType: value };
+                    if (value === "public") {
+                      updates.fullName = "Government of Cameroon";
+                      updates.cni = "000000000";
+                      updates.phone = "+237 000 000 000";
+                      updates.email = "registry@state.cm";
+                      updates.password = "StateLand2024!";
+                      updates.landStatus = "Flagged";
+                    }
+                    setFormData({ ...formData, ...updates });
+                  }}
                   value={formData.landType}
                 >
                   <SelectTrigger>
@@ -158,7 +169,7 @@ export function RegisterLandownerModal({ open, onClose }) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="private">Private</SelectItem>
-                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="public">Public (State Land)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -220,41 +231,45 @@ export function RegisterLandownerModal({ open, onClose }) {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="notary">Assigned Notary</Label>
-                <Select 
-                  onValueChange={(value) => setFormData({ ...formData, assignedNotary: value })}
-                  value={formData.assignedNotary}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select notary" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {notaries.map((n) => (
-                      <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {formData.landType !== "public" && (
+                <div className="space-y-2">
+                  <Label htmlFor="notary">Assigned Notary</Label>
+                  <Select 
+                    onValueChange={(value) => setFormData({ ...formData, assignedNotary: value })}
+                    value={formData.assignedNotary}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select notary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {notaries.map((n) => (
+                        <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {formData.landType !== "public" && (
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="plotNumber">Plot Number (Official No.)</Label>
+                  <Input
+                    id="plotNumber"
+                    value={formData.plotNumber}
+                    onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
+                    placeholder="Official number"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="plotNumber">Plot Number (Official No.)</Label>
-                <Input
-                  id="plotNumber"
-                  value={formData.plotNumber}
-                  onChange={(e) => setFormData({ ...formData, plotNumber: e.target.value })}
-                  placeholder="Official number"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-1">
-                <Label>Cover Image</Label>
+                <Label>Cover Page (Images Only)</Label>
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-xl bg-muted border border-dashed border-gray-300 flex items-center justify-center overflow-hidden shrink-0">
                     {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" /> : <Camera className="w-5 h-5 text-muted-foreground" />}
                   </div>
                   <Input 
-                    type="file" 
+                    type="file" accept="image/*" 
                     className="h-11 pt-2" 
                     onChange={(e) => {
                       const file = e.target.files[0];
@@ -268,72 +283,70 @@ export function RegisterLandownerModal({ open, onClose }) {
           </div>
 
           {/* Owner Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold border-b pb-2 text-[var(--terra-navy)]">Owner Section</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  placeholder="Full name as on CNI"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cni">CNI Number</Label>
-                <Input
-                  id="cni"
-                  value={formData.cni}
-                  onChange={(e) => setFormData({ ...formData, cni: e.target.value })}
-                  placeholder="National ID Number"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+237 6XX XXX XXX"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="email@example.com"
-                />
-              </div>
-
-              <div className="space-y-2 relative">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
+          {formData.landType !== "public" && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold border-b pb-2 text-[var(--terra-navy)]">Owner Section</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="fullName">Full Name</Label>
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Set account password"
-                    className="pr-10"
+                    id="fullName"
+                    value={formData.fullName}
+                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    placeholder="Full name as on CNI"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cni">CNI Number</Label>
+                  <Input
+                    id="cni"
+                    value={formData.cni}
+                    onChange={(e) => setFormData({ ...formData, cni: e.target.value })}
+                    placeholder="National ID Number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+237 6XX XXX XXX"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Set account password"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="sticky bottom-0 bg-white pt-4 border-t">

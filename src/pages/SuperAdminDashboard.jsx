@@ -21,26 +21,36 @@ export default function SuperAdminDashboard() {
   const [officerSearch, setOfficerSearch] = useState("");
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [officers, setOfficers] = useState([]);
+  const [statePlots, setStatePlots] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchOfficers = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get('/users');
-      if (response.data.success) {
-        // Filter only LRO and Notary for this page
-        const filtered = response.data.data.filter(u => u.role === "LRO" || u.role === "Notary");
+      setLoading(true);
+      const [officersRes, plotsRes] = await Promise.all([
+        api.get('/users'),
+        api.get('/land')
+      ]);
+
+      if (officersRes.data.success) {
+        const filtered = officersRes.data.data.filter(u => u.role === "LRO" || u.role === "Notary");
         setOfficers(filtered);
       }
+
+      if (plotsRes.data.success) {
+        const stateOwned = plotsRes.data.data.filter(p => p.landType === "00050");
+        setStatePlots(stateOwned);
+      }
     } catch (err) {
-      console.error("Failed to fetch officers:", err);
+      console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOfficers();
-    window.refreshOfficerList = fetchOfficers;
+    fetchData();
+    window.refreshOfficerList = fetchData;
     return () => delete window.refreshOfficerList;
   }, []);
 
@@ -113,6 +123,52 @@ export default function SuperAdminDashboard() {
             </Card>
           </motion.div>
         ))}
+      </div>
+
+      {/* State Land Portfolio (My Land Plots) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold font-['Syne']">State Land Portfolio</h2>
+            <p className="text-muted-foreground text-sm">Public land plots currently owned by the Government of Cameroon</p>
+          </div>
+          <Badge className="bg-amber-100 text-amber-700 border-0">{statePlots.length} Plots Managed</Badge>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {statePlots.map((plot) => (
+            <motion.div key={plot.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <Card className="overflow-hidden group hover:shadow-xl transition-all border-border">
+                <div className="relative h-40 overflow-hidden bg-muted">
+                  <img 
+                    src={plot.coverImage?.startsWith('http') ? plot.coverImage : `http://localhost:5001${plot.coverImage || '/assets/images/plots/default-plot.jpg'}`} 
+                    alt={plot.landCode}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                  />
+                  <div className="absolute top-2 left-2">
+                    <Badge className="bg-[var(--terra-navy)] text-white border-0 text-[10px]">PUBLIC</Badge>
+                  </div>
+                </div>
+                <CardContent className="p-4">
+                  <p className="text-xs font-mono font-bold text-muted-foreground truncate">{plot.landCode}</p>
+                  <p className="font-bold text-sm mt-1 truncate">{plot.location}</p>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                    <span className="text-xs text-muted-foreground">{plot.area}m²</span>
+                    <Badge variant="outline" className="text-[9px] uppercase border-amber-200 text-amber-700 bg-amber-50">
+                      {plot.status}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+          {statePlots.length === 0 && (
+            <div className="col-span-full py-12 text-center bg-muted/30 rounded-2xl border-2 border-dashed">
+              <Database className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-20" />
+              <p className="text-muted-foreground font-medium">No state-owned plots found in the registry.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">

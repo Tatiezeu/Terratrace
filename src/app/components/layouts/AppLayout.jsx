@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { TopNav } from "./TopNav";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
+import { toast } from "sonner";
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -27,6 +28,16 @@ export default function AppLayout() {
             ? (rawUser.profilePic.startsWith('http') ? rawUser.profilePic : `http://localhost:5001${rawUser.profilePic}`)
             : `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`,
       });
+
+      const welcomeKey = `welcome_shown_${rawUser._id || rawUser.id}`;
+      if (!sessionStorage.getItem(welcomeKey)) {
+        setTimeout(() => {
+          toast.success(`Welcome back, ${rawUser.firstName || "User"}!`, {
+            description: "You have successfully logged into the TerraTrace Portal.",
+          });
+        }, 800);
+        sessionStorage.setItem(welcomeKey, "true");
+      }
     }
   }, [rawUser, loading, navigate]);
 

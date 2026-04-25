@@ -34,9 +34,17 @@ export default function MyLandPlotsPage() {
 
   // Filter based on land code owner segment as requested
   const myPlots = useMemo(() => {
-    if (!user || !user.cniNumber) return plots;
-    const ownerId = user.cniNumber.slice(-5).padStart(5, '0');
-    return plots.filter(plot => plot.landCode.split('-')[2] === ownerId);
+    if (!user) return plots;
+    
+    // If SuperAdmin, they should also see State Land (ownerId 00000)
+    const isSuperAdmin = user.role === 'SuperAdmin';
+    const ownerIdFromCNI = user.cniNumber ? user.cniNumber.slice(-5).padStart(5, '0') : null;
+    
+    return plots.filter(plot => {
+      const plotOwnerId = plot.landCode.split('-')[2];
+      if (isSuperAdmin && plotOwnerId === '00000') return true;
+      return plotOwnerId === ownerIdFromCNI;
+    });
   }, [plots, user]);
 
   const handleSeeMore = (plot) => {

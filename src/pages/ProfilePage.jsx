@@ -92,9 +92,15 @@ export default function ProfilePage() {
 
       if (response.data.success) {
         toast.success("Profile updated successfully!");
-        setUserData(response.data.data);
+        const updatedUser = response.data.data;
+        setUserData(updatedUser);
+        if (updatedUser.profilePic) {
+          // Add timestamp to bust cache
+          const baseUrl = updatedUser.profilePic.startsWith('http') ? updatedUser.profilePic : `http://localhost:5001${updatedUser.profilePic}`;
+          setProfilePic(`${baseUrl}?t=${Date.now()}`);
+        }
         setSelectedFile(null);
-        // Dispatch event to refresh navbar
+        // Dispatch event to refresh navbar/context
         window.dispatchEvent(new Event('auth-update'));
       }
     } catch (err) {

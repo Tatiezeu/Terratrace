@@ -48,18 +48,22 @@ export default function LoginPage() {
         }
 
         const userData = response.data.data?.user || response.data.data;
+        if (!userData) {
+          throw new Error("User data missing in response");
+        }
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(userData));
-        if (userData?.firstName) {
-          toast.success("Login Successful", {
-            description: `Welcome back, ${userData.firstName}!`,
-          });
-        }
+        
+        toast.success("Login Successful", {
+          description: `Welcome back, ${userData.firstName || "Officer"}!`,
+        });
+        
         setTimeout(() => {
           window.location.href = "/dashboard";
         }, 300);
       }
     } catch (err) {
+      console.error("Login detail:", err);
       if (err.response?.status === 401 && err.response?.data?.message?.includes("not verified")) {
         localStorage.setItem('temp_email', email);
         toast.info("Verification Required", {
@@ -68,7 +72,7 @@ export default function LoginPage() {
         navigate("/verify-email");
       } else {
         toast.error("Login failed", {
-          description: err.response?.data?.message || "Invalid credentials.",
+          description: err.response?.data?.message || err.message || "Invalid credentials.",
         });
       }
     } finally {

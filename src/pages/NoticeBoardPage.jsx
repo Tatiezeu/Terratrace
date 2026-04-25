@@ -13,19 +13,16 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "../app/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../app/components/ui/select";
-import { mockNotices } from "../data/mockData";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
-
-const ALL_REGIONS = ["All", ...new Set(mockNotices.map(n => n.region))];
-const ALL_CATEGORIES = ["All", ...new Set(mockNotices.map(n => n.category))];
-
-const statusColors = {
-  active:  "bg-emerald-100 text-emerald-700 border-emerald-200",
-  expired: "bg-gray-100 text-gray-500 border-gray-200",
-};
+import api from "../utils/api";
+import { useEffect } from "react";
+import { cn } from "../app/components/ui/utils";
+import { useAuth } from "../context/AuthContext";
 
 export default function NoticeBoardPage() {
+  const { user } = useAuth();
+  const [notices, setNotices] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -33,40 +30,54 @@ export default function NoticeBoardPage() {
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [objectionMsg, setObjectionMsg] = useState("");
   const [countdownOpen, setCountdownOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotices = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/transfer/public-notices');
+      if (res.data.success) setNotices(res.data.data);
+    } catch (err) {
+      toast.error("Failed to fetch public notices");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotices();
+  }, []);
 
   const filteredNotices = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return mockNotices.filter(n => {
-      const matchesSearch = !q ||
-        n.title.toLowerCase().includes(q) ||
-        n.landCode.toLowerCase().includes(q) ||
-        n.location.toLowerCase().includes(q);
-      const matchesRegion   = regionFilter === "All"   || n.region   === regionFilter;
-      const matchesCategory = categoryFilter === "All" || n.category === categoryFilter;
-      return matchesSearch && matchesRegion && matchesCategory;
+    return notices.filter(n => {
+      const title = `Public Notice: Plot ${n.plot.landCode}`;
+      const location = n.plot.location;
+      const matchesSearch = !q || title.toLowerCase().includes(q) || n.plot.landCode.toLowerCase().includes(q) || location.toLowerCase().includes(q);
+      const matchesRegion = regionFilter === "All" || location.toLowerCase().includes(regionFilter.toLowerCase());
+      return matchesSearch && matchesRegion;
     });
-  }, [searchQuery, regionFilter, categoryFilter]);
-
-  const activeCount  = mockNotices.filter(n => n.status === "active").length;
-  const expiredCount = mockNotices.filter(n => n.status === "expired").length;
+  }, [searchQuery, regionFilter, notices]);
 
   const openObjection = (notice) => {
     setSelectedNotice(notice);
-    setObjectionMsg(`Dear LRO ${notice.lroName},\n\nI write to formally contest the land transfer notice (Plot: ${notice.landCode}) published on ${notice.publishedAt} on the TerraTrace platform.\n\nMy objection is based on the following grounds:\n[Please describe your objection here]\n\nI request that this matter be reviewed before any transfer is finalized.\n\nRespectfully,\n[Your Full Name]\n[CNI Number]\n[Contact]`);
+    setObjectionMsg(`Dear LRO ${notice.lro?.firstName} ${notice.lro?.lastName},\n\nI write to formally contest the land transfer notice (Plot: ${notice.plot.landCode}) published on the TerraTrace platform.\n\nMy objection is based on the following grounds:\n[Please describe your objection here]\n\nI request that this matter be reviewed before any transfer is finalized.`);
     setObjectionOpen(true);
   };
 
-  const openCountdown = (notice) => {
-    setSelectedNotice(notice);
-    setCountdownOpen(true);
+  const handleSendObjection = async () => {
+    try {
+      await api.post(`/transfer/${selectedNotice._id}/objection`, { reason: objectionMsg });
+      toast.success("Objection submitted successfully!");
+      setObjectionOpen(false);
+    } catch (err) {
+      toast.error("Failed to submit objection");
+    }
   };
 
-  const handleSendObjection = () => {
-    setObjectionOpen(false);
-    toast.success("Objection submitted!", {
-      description: `Your formal objection for plot ${selectedNotice?.landCode} has been sent to ${selectedNotice?.lroName}.`,
-      duration: 5000,
-    });
+  const getDaysLeft = (endDate) => {
+    const diff = new Date(endDate) - new Date();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
   const clearFilters = () => {
@@ -89,12 +100,11 @@ export default function NoticeBoardPage() {
           Official land transfer, succession, and dispute notices across Cameroon's 10 regions.
         </p>
         <div className="flex gap-4 mt-4">
-          <div className="flex items-center gap-2 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span><strong>{activeCount}</strong> Active</span></div>
-          <div className="flex items-center gap-2 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-gray-400" /><span><strong>{expiredCount}</strong> Expired</span></div>
+          <div className="flex items-center gap-2 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span><strong>{notices.length}</strong> Active Notices</span></div>
         </div>
       </div>
 
-      {/* Search + Filters */}
+      {/* Search + Filters omitted for brevity, keeping existing structure */}
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
@@ -105,48 +115,19 @@ export default function NoticeBoardPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            )}
           </div>
 
-          {/* Region filter */}
           <Select value={regionFilter} onValueChange={setRegionFilter}>
             <SelectTrigger className="w-full md:w-48 h-11">
               <MapPin className="w-4 h-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="All Regions" />
             </SelectTrigger>
             <SelectContent>
-              {ALL_REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              <SelectItem value="All">All Regions</SelectItem>
+              {["Centre", "Littoral", "West", "South", "North"].map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
             </SelectContent>
           </Select>
-
-          {/* Category filter */}
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full md:w-48 h-11">
-              <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              {ALL_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {activeFilterCount > 0 && (
-            <Button variant="ghost" onClick={clearFilters} className="gap-2 text-muted-foreground h-11">
-              <X className="w-4 h-4" /> Clear
-            </Button>
-          )}
         </div>
-
-        {/* Active filters summary */}
-        {(searchQuery || activeFilterCount > 0) && (
-          <p className="text-xs text-muted-foreground">
-            Showing <strong className="text-foreground">{filteredNotices.length}</strong> of {mockNotices.length} notices
-          </p>
-        )}
       </div>
 
       {/* Notice Cards */}
@@ -154,7 +135,7 @@ export default function NoticeBoardPage() {
         <AnimatePresence>
           {filteredNotices.map((notice, index) => (
             <motion.div
-              key={notice.id}
+              key={notice._id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -162,38 +143,48 @@ export default function NoticeBoardPage() {
             >
               <Card className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all group h-full flex flex-col">
                 <div className="relative h-48">
-                  <img src={notice.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={notice.plot.coverImage ? `http://localhost:5001${notice.plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   <div className="absolute top-4 right-4">
-                    <Badge className={`${statusColors[notice.status]} border text-[10px] uppercase font-bold`}>
-                      {notice.status}
+                    <Badge className={cn(
+                      "border text-[10px] uppercase font-bold",
+                      new Date(notice.publicNotice.endDate) < new Date() 
+                        ? "bg-red-100 text-red-700 border-red-200" 
+                        : "bg-emerald-100 text-emerald-700 border-emerald-200"
+                    )}>
+                      {new Date(notice.publicNotice.endDate) < new Date() ? "EXPIRED NOTICE" : "ACTIVE NOTICE"}
                     </Badge>
                   </div>
                   <div className="absolute bottom-4 left-4 right-4">
                     <div className="flex gap-2 mb-2">
-                      <Badge className="bg-[var(--terra-emerald)] text-white border-0 text-[10px]">{notice.landCode}</Badge>
-                      <Badge className="bg-white/20 text-white border-0 text-[10px]">{notice.category}</Badge>
+                      <Badge className="bg-[var(--terra-emerald)] text-white border-0 text-[10px]">{notice.plot.landCode}</Badge>
+                      <Badge className="bg-white/20 text-white border-0 text-[10px]">{notice.transferType?.replace('_', ' ') || "TRANSFER"}</Badge>
                     </div>
-                    <h3 className="text-white font-bold text-base leading-tight">{notice.title}</h3>
+                    <h3 className="text-white font-bold text-base leading-tight">Land Transfer Verification Protocol</h3>
                   </div>
                 </div>
 
                 <CardContent className="p-6 flex-1 flex flex-col">
                   <div className="space-y-4 flex-1">
                     <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{notice.publishedAt}</div>
-                      <div className={`flex items-center gap-1 font-medium ${notice.status === "active" ? "text-red-500" : "text-gray-400"}`}>
-                        <Clock className="w-3.5 h-3.5" />Expires: {notice.expiresAt}
+                      <div className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(notice.publicNotice.startDate).toLocaleDateString()}</div>
+                      <div className={cn(
+                        "flex items-center gap-1 font-medium",
+                        new Date(notice.publicNotice.endDate) < new Date() ? "text-red-500" : "text-emerald-600"
+                      )}>
+                        <Clock className="w-3.5 h-3.5" />Expires: {new Date(notice.publicNotice.endDate).toLocaleString()}
                       </div>
-                      <div className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{notice.location}</div>
+                      <div className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{notice.plot.location}</div>
                     </div>
 
-                    <p className="text-sm text-muted-foreground leading-relaxed">{notice.description}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed italic">
+                      "The land in question is about to be transferred from {notice.sender.firstName} {notice.sender.lastName} to {notice.receiver?.firstName} {notice.receiver?.lastName}."
+                    </p>
 
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-[10px] text-amber-700 leading-snug">
-                        <strong className="text-amber-800">LRO in charge:</strong> {notice.lroName}. File any objection before the expiry date.
+                        <strong className="text-amber-800">LRO in charge:</strong> {notice.lro?.firstName} {notice.lro?.lastName}. File any objection before the expiry date.
                       </p>
                     </div>
                   </div>
@@ -206,25 +197,22 @@ export default function NoticeBoardPage() {
                       <span className="text-[10px] font-bold text-muted-foreground uppercase">Certified Notice</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      {notice.status === "active" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          onClick={() => openCountdown(notice)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {notice.status === "active" && (
-                        <Button
-                          variant="ghost"
-                          className="text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
-                          onClick={() => openObjection(notice)}
-                        >
-                          File Objection <ArrowRight className="w-3 h-3" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        onClick={() => { setSelectedNotice(notice); setCountdownOpen(true); }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={new Date(notice.publicNotice.endDate) < new Date() || notice.receiver?._id === user?._id}
+                        className="text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 disabled:opacity-30"
+                        onClick={() => openObjection(notice)}
+                      >
+                        File Objection <ArrowRight className="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -291,42 +279,106 @@ export default function NoticeBoardPage() {
           <DialogHeader className="mb-4">
             <DialogTitle className="font-['Syne'] text-center text-2xl">Notice Period</DialogTitle>
             <DialogDescription className="text-center">
-              Time remaining for public opposition of Plot {selectedNotice?.landCode}
+              Time remaining for public opposition of Plot {selectedNotice?.plot?.landCode}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col items-center justify-center space-y-8 py-4">
-            <div className="relative w-48 h-48 flex items-center justify-center">
-              <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/10" />
-                <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="289" strokeDashoffset="80" strokeLinecap="round" className="text-[var(--terra-emerald)] transition-all duration-1000" />
-              </svg>
-              <div className="flex flex-col items-center animate-pulse">
-                <Timer className="w-6 h-6 text-[var(--terra-emerald)] mb-1" />
-                <span className="text-4xl font-black text-[#002147]">18</span>
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Days Left</span>
-              </div>
-            </div>
-
-            <div className="w-full space-y-4">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                <span>Published: {selectedNotice?.publishedAt}</span>
-                <span>Expires: {selectedNotice?.expiresAt}</span>
-              </div>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-[var(--terra-emerald)] w-[60%]" />
-              </div>
-              <p className="text-xs text-center text-muted-foreground italic">
-                Any objections must be filed before the countdown reaches zero.
-              </p>
-            </div>
-          </div>
+          <CountdownDisplay targetDate={selectedNotice?.publicNotice?.endDate} />
 
           <Button onClick={() => setCountdownOpen(false)} className="w-full bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white h-12 rounded-xl text-sm font-bold uppercase tracking-widest">
             Close View
           </Button>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function CountdownDisplay({ targetDate }) {
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  useEffect(() => {
+    if (!targetDate) return;
+
+    const calculateTime = () => {
+      const target = new Date(targetDate).getTime();
+      const now = new Date().getTime();
+      const distance = target - now;
+
+      if (distance < 0) {
+        return { days: 0, hours: 0, minutes: 0, seconds: 0, percentage: 0, isExpired: true };
+      }
+
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      
+      // Default to 30 days for progress calculation, or actual duration if larger
+      const maxDuration = 30 * 24 * 60 * 60 * 1000;
+      const percentage = Math.min(100, (distance / maxDuration) * 100);
+
+      return { days, hours, minutes, seconds, percentage, isExpired: false };
+    };
+
+    // Initial calculation
+    setTimeLeft(calculateTime());
+
+    const timer = setInterval(() => {
+      setTimeLeft(calculateTime());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  if (!timeLeft) return <div className="h-48 flex items-center justify-center"><Timer className="animate-spin text-muted-foreground" /></div>;
+
+  const { isExpired } = timeLeft;
+
+  return (
+    <div className="flex flex-col items-center justify-center space-y-8 py-4">
+      <div className="relative w-48 h-48 flex items-center justify-center">
+        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/10" />
+          <circle 
+            cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" 
+            strokeDasharray="289" 
+            strokeDashoffset={289 - (289 * timeLeft.percentage) / 100} 
+            strokeLinecap="round" 
+            className={`${isExpired ? 'text-red-500' : 'text-[var(--terra-emerald)]'} transition-all duration-1000`} 
+          />
+        </svg>
+        <div className={`flex flex-col items-center ${!isExpired && 'animate-pulse'}`}>
+          <Timer className={`w-6 h-6 mb-1 ${isExpired ? 'text-red-500' : 'text-[var(--terra-emerald)]'}`} />
+          {timeLeft.days > 0 ? (
+            <>
+              <span className="text-4xl font-black text-[#002147]">{timeLeft.days}</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Days Left</span>
+            </>
+          ) : (
+            <>
+              <span className="text-3xl font-black text-[#002147]">{String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Hrs : Min : Sec</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="w-full space-y-4">
+        <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <span>Expires: {new Date(targetDate).toLocaleString()}</span>
+          <span className={isExpired ? 'text-red-500' : 'text-emerald-500'}>{isExpired ? 'EXPIRED' : 'ACTIVE'}</span>
+        </div>
+        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-1000 ${isExpired ? 'bg-red-500' : 'bg-[var(--terra-emerald)]'}`} 
+            style={{ width: `${timeLeft.percentage}%` }} 
+          />
+        </div>
+        <p className="text-xs text-center text-muted-foreground italic">
+          {isExpired ? 'The notice period has ended. No more objections can be filed.' : 'Any objections must be filed before the countdown reaches zero.'}
+        </p>
+      </div>
     </div>
   );
 }

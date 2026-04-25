@@ -76,6 +76,9 @@ export default function SettingsPage() {
                 if (config.smtpPort) setSmtpPort(config.smtpPort);
                 if (config.smtpUser) setSmtpUser(config.smtpUser);
                 if (config.smtpPass) setSmtpPass(config.smtpPass);
+                if (config.noticeDurationDays) setNoticeDurationDays(config.noticeDurationDays);
+                if (config.noticeTestMode !== undefined) setNoticeTestMode(config.noticeTestMode);
+                if (config.noticeTestMinutes) setNoticeTestMinutes(config.noticeTestMinutes);
             }
         } catch (err) {
             console.error("Failed to fetch config:", err);
@@ -557,7 +560,7 @@ export default function SettingsPage() {
                   <p className="text-[11px] text-muted-foreground bg-white/50 border rounded-xl p-4 leading-relaxed">
                     The Cameroon Land Registration Act (Article 17) mandates a minimum public notice period of 30 days.
                   </p>
-                  <Button onClick={() => toast.success("Notice duration saved!")} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white rounded-xl h-11 px-8 font-bold">
+                  <Button onClick={() => updateConfig({ noticeDurationDays, noticeTestMode: false })} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white rounded-xl h-11 px-8 font-bold">
                     Update Production Policy
                   </Button>
                 </div>
@@ -581,7 +584,7 @@ export default function SettingsPage() {
                       <span className="absolute right-0">30 min</span>
                     </div>
                   </div>
-                  <Button onClick={() => toast.success("Test duration applied!")} className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-11 px-8 font-bold">
+                  <Button onClick={() => updateConfig({ noticeTestMinutes, noticeTestMode: true })} className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl h-11 px-8 font-bold">
                     Apply Test Duration
                   </Button>
                 </div>

@@ -12,19 +12,31 @@ import {
 } from "../ui/popover";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import api from "../../../utils/api";
 
 export function TopNav({ user, onRoleChange }) {
   const [time, setTime] = useState(new Date());
   const { theme, setTheme } = useTheme();
-  
-  // Mock live notifications for the bell
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Plot Approval", message: "Investigation for CM-234 is complete.", time: "2m ago", unread: true },
-    { id: 2, title: "New Message", message: "Notary Jean-Pierre sent documents.", time: "1h ago", unread: true },
-    { id: 3, title: "Payment Due", message: "Service fee for Plot 7890 pending.", time: "5h ago", unread: false },
-  ]);
+  const [notifications, setNotifications] = useState([]);
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter(n => n.status === 'unread').length;
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await api.get('/notifications');
+      if (response.data.success) {
+        setNotifications(response.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -33,23 +45,42 @@ export function TopNav({ user, onRoleChange }) {
     return () => clearInterval(timer);
   }, []);
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, unread: false })));
-    toast.success("All notifications marked as read", { description: "You're all caught up!" });
+  const markAllAsRead = async () => {
+    try {
+      await Promise.all(
+        notifications
+          .filter(n => n.status === 'unread')
+          .map(n => api.patch(`/notifications/${n._id}/status`, { status: 'read' }))
+      );
+      toast.success("All notifications marked as read");
+      fetchNotifications();
+    } catch (err) {
+      toast.error("Failed to mark as read");
+    }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
-    toast.success("Cleared all notifications");
+  const clearAll = async () => {
+    try {
+      await api.delete('/notifications');
+      toast.success("Cleared all notifications");
+      setNotifications([]);
+    } catch (err) {
+      toast.error("Failed to clear notifications");
+    }
   };
 
-  const handleAction = (id, action) => {
-    if (action === 'read') {
-      setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
-      toast.success("Marked as read");
-    } else if (action === 'delete') {
-      setNotifications(notifications.filter(n => n.id !== id));
-      toast.success("Notification removed");
+  const handleAction = async (id, action) => {
+    try {
+      if (action === 'read') {
+        await api.patch(`/notifications/${id}/status`, { status: 'read' });
+        toast.success("Marked as read");
+      } else if (action === 'delete') {
+        await api.delete(`/notifications/${id}`);
+        toast.success("Notification removed");
+      }
+      fetchNotifications();
+    } catch (err) {
+      toast.error(`Failed to ${action} notification`);
     }
   };
 
@@ -111,27 +142,29 @@ export function TopNav({ user, onRoleChange }) {
             </div>
             <div className="max-h-[360px] overflow-y-auto custom-scrollbar bg-white dark:bg-slate-800 divide-y divide-border/50">
               {notifications.length > 0 ? (
-                notifications.map((n) => (
+                notifications.slice(0, 10).map((n) => (
                   <div 
-                    key={n.id} 
-                    className={`p-4 flex gap-3 hover:bg-accent/30 transition-colors relative group/item ${n.unread ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""}`}
+                    key={n._id} 
+                    className={`p-4 flex gap-3 hover:bg-accent/30 transition-colors relative group/item ${n.status === 'unread' ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""}`}
                   >
-                    <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.unread ? "bg-emerald-500" : "bg-transparent"}`} />
+                    <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.status === 'unread' ? "bg-emerald-500" : "bg-transparent"}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-foreground">{n.title}</p>
                       <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>
-                      <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium tracking-wider">{n.time}</p>
+                      <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium tracking-wider">
+                        {new Date(n.createdAt).toLocaleDateString()} {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
                     <div className="flex flex-col gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                       <Link to="/dashboard/notifications" className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950 rounded text-blue-500" title="Reply">
                         <Reply className="w-3.5 h-3.5" />
                       </Link>
-                      {n.unread && (
-                        <button onClick={() => handleAction(n.id, 'read')} className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded text-emerald-500" title="Mark as read">
+                      {n.status === 'unread' && (
+                        <button onClick={() => handleAction(n._id, 'read')} className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded text-emerald-500" title="Mark as read">
                           <Check className="w-3.5 h-3.5" />
                         </button>
                       )}
-                      <button onClick={() => handleAction(n.id, 'delete')} className="p-1 hover:bg-red-50 dark:hover:bg-red-950 rounded text-red-500" title="Remove">
+                      <button onClick={() => handleAction(n._id, 'delete')} className="p-1 hover:bg-red-50 dark:hover:bg-red-950 rounded text-red-500" title="Remove">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -169,7 +202,7 @@ export function TopNav({ user, onRoleChange }) {
           <Avatar className="w-10 h-10 ring-2 ring-[var(--terra-emerald)] ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatar} alt={user.name} />
             <AvatarFallback className="bg-[var(--terra-navy)] text-white font-semibold">
-              {user.name.split(" ").map((n) => n[0]).join("")}
+              {user.name ? user.name.split(" ").map((n) => n[0]).join("") : "U"}
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">

@@ -13,6 +13,7 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import api from "../utils/api";
+import { cn } from "../app/components/ui/utils";
 import { mockActivityLogs } from "../data/mockData";
 
 export default function SuperAdminDashboard() {
@@ -22,14 +23,16 @@ export default function SuperAdminDashboard() {
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [officers, setOfficers] = useState([]);
   const [statePlots, setStatePlots] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [officersRes, plotsRes] = await Promise.all([
+      const [officersRes, plotsRes, notifRes] = await Promise.all([
         api.get('/users'),
-        api.get('/land')
+        api.get('/land'),
+        api.get('/notifications')
       ]);
 
       if (officersRes.data.success) {
@@ -40,6 +43,10 @@ export default function SuperAdminDashboard() {
       if (plotsRes.data.success) {
         const stateOwned = plotsRes.data.data.filter(p => p.landType === "00050");
         setStatePlots(stateOwned);
+      }
+
+      if (notifRes.data.success) {
+        setNotifications(notifRes.data.data);
       }
     } catch (err) {
       console.error("Failed to fetch data:", err);
@@ -56,7 +63,7 @@ export default function SuperAdminDashboard() {
 
   const lroCount    = officers.filter(o => o.role === "LRO").length;
   const notaryCount = officers.filter(o => o.role === "Notary").length;
-  const totalUsers  = officers.length; // Or fetch total users separately if needed
+  const totalUsers  = officers.length; 
 
   const stats = [
     { label: "Total LRO Officers",    value: lroCount,    icon: <Building className="w-5 h-5 text-blue-500" />,    change: "+2 this month" },
@@ -82,6 +89,20 @@ export default function SuperAdminDashboard() {
     setOfficerType(type);
     setIsRegisterOpen(true);
   };
+
+  const handleNotifAction = async (id, action) => {
+    try {
+      if (action === 'read') {
+        await api.patch(`/notifications/${id}/status`, { status: 'read' });
+      } else if (action === 'delete') {
+        await api.delete(`/notifications/${id}`);
+      }
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to update notification");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
@@ -125,7 +146,7 @@ export default function SuperAdminDashboard() {
         ))}
       </div>
 
-      {/* State Land Portfolio (My Land Plots) */}
+      {/* State Land Portfolio */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -137,7 +158,7 @@ export default function SuperAdminDashboard() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {statePlots.map((plot) => (
-            <motion.div key={plot.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <motion.div key={plot._id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
               <Card className="overflow-hidden group hover:shadow-xl transition-all border-border">
                 <div className="relative h-40 overflow-hidden bg-muted">
                   <img 
@@ -189,11 +210,6 @@ export default function SuperAdminDashboard() {
                   onChange={(e) => setOfficerSearch(e.target.value)}
                 />
               </div>
-              {officerSearch && (
-                <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => setOfficerSearch("")}>
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -210,7 +226,7 @@ export default function SuperAdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredOfficers.map((officer) => (
-                    <tr key={officer.id} className="hover:bg-accent/5 transition-colors">
+                    <tr key={officer._id} className="hover:bg-accent/5 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-[var(--terra-navy)]/10 flex items-center justify-center font-bold text-[var(--terra-navy)] text-xs shrink-0">
@@ -239,21 +255,74 @@ export default function SuperAdminDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {filteredOfficers.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">
-                        No officers match your search.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
           </CardContent>
         </Card>
 
-        {/* Log Activity */}
+        {/* System Notifications & Logs */}
         <div className="space-y-6">
+          <Card className="border-emerald-100 shadow-emerald-500/5">
+            <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/30">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-emerald-600" />
+                  System Notifications
+                </CardTitle>
+                {notifications.filter(n => n.status === 'unread').length > 0 && (
+                  <Badge className="bg-red-500 text-white animate-pulse">
+                    {notifications.filter(n => n.status === 'unread').length} New
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border/50 max-h-[350px] overflow-y-auto custom-scrollbar">
+                {notifications.length > 0 ? (
+                  notifications.map((n) => (
+                    <div key={n._id} className={cn(
+                      "p-4 hover:bg-accent/30 transition-colors group relative",
+                      n.status === 'unread' ? "bg-emerald-50/40" : ""
+                    )}>
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "w-2 h-2 mt-1.5 rounded-full shrink-0",
+                          n.status === 'unread' ? "bg-red-500 animate-pulse" : "bg-transparent"
+                        )} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                            {n.title}
+                            {n.type === 'unblock_request' && <Badge variant="outline" className="text-[8px] bg-red-50 text-red-600 border-red-200">UNBLOCK REQ</Badge>}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                          <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium tracking-wider">
+                            {new Date(n.createdAt).toLocaleDateString()} · {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {n.status === 'unread' && (
+                            <Button onClick={() => handleNotifAction(n._id, 'read')} variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          <Button onClick={() => handleNotifAction(n._id, 'delete')} variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <ShieldAlert className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs font-medium">No system alerts</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
@@ -263,7 +332,7 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 6)).map((log) => (
+                {(showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4)).map((log) => (
                   <div key={log.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
                     <div className={`w-1 rounded-full shrink-0 h-12 ${log.status === "success" ? "bg-emerald-500" : log.status === "failed" ? "bg-red-400" : "bg-amber-400"}`} />
                     <div className="min-w-0">
@@ -278,36 +347,8 @@ export default function SuperAdminDashboard() {
                   className="w-full text-xs font-bold uppercase tracking-widest gap-2"
                   onClick={() => setShowAllLogs(!showAllLogs)}
                 >
-                  {showAllLogs ? "View Less Logs" : "View Full Logs"} <ArrowUpRight className={`w-3 h-3 transition-transform ${showAllLogs ? "rotate-180" : ""}`} />
+                  {showAllLogs ? "View Less" : "View More"} <ArrowUpRight className={`w-3 h-3 transition-transform ${showAllLogs ? "rotate-180" : ""}`} />
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-600 to-blue-700 text-white relative overflow-hidden">
-            <div className="absolute -bottom-8 -right-8 opacity-20 rotate-12">
-              <ShieldAlert className="w-32 h-32" />
-            </div>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold font-['Syne']">Security Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-white/70">Health Score</span>
-                <span className="text-sm font-bold">99.8%</span>
-              </div>
-              <div className="w-full bg-white/20 h-1 rounded-full mb-6">
-                <div className="bg-emerald-400 h-full w-[99.8%] rounded-full" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-white/10 text-center">
-                  <p className="text-xl font-bold">0</p>
-                  <p className="text-[10px] text-white/60">Breaches</p>
-                </div>
-                <div className="p-3 rounded-xl bg-white/10 text-center">
-                  <p className="text-xl font-bold">12K</p>
-                  <p className="text-[10px] text-white/60">Requests/h</p>
-                </div>
               </div>
             </CardContent>
           </Card>

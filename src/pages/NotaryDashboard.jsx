@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Gavel, 
   FileText, 
@@ -13,9 +13,17 @@ import {
   Download,
   CheckCircle2,
   Timer,
-  Maximize2
+  Maximize2,
+  Send,
+  Upload as UploadIcon,
+  CreditCard,
+  UserCheck,
+  FileCheck,
+  ExternalLink,
+  History,
+  X
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
 import { Badge } from "../app/components/ui/badge";
 import { Input } from "../app/components/ui/input";
@@ -27,507 +35,441 @@ import {
   DialogDescription,
   DialogFooter
 } from "../app/components/ui/dialog";
-import { VerificationModal } from "../app/components/notary/VerificationModal";
-import { mockTransferRequests, mockLandPlots } from "../data/mockData";
+import { Label } from "../app/components/ui/label";
+import { Textarea } from "../app/components/ui/textarea";
 import { toast } from "sonner";
+import api from "../utils/api";
+import { useAuth } from "../context/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../app/components/ui/select";
+import { motion, AnimatePresence } from "motion/react";
+import { cn } from "../app/components/ui/utils";
 
 export default function NotaryDashboard() {
-  const [selectedRequestId, setSelectedRequestId] = useState(null);
-  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
+  const { user: currentUser } = useAuth();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [statusModal, setStatusModal] = useState({ type: null, requestId: null });
-  const [verificationStartStep, setVerificationStartStep] = useState(1);
-  const [caseSummaryModal, setCaseSummaryModal] = useState(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState(null);
-  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
+  const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
+  const [isPaymentReceivedModalOpen, setIsPaymentReceivedModalOpen] = useState(false);
+  
+  // Form States
+  const [feeAmount, setFeeAmount] = useState("");
+  const [feeDesc, setFeeDesc] = useState("");
+  const [buyerDocs, setBuyerDocs] = useState([]);
+  const [certifiedDocs, setCertifiedDocs] = useState([]);
+  const [lros, setLros] = useState([]);
+  const [selectedLro, setSelectedLro] = useState("");
 
-  const filterRequests = (requests) => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return requests;
-    return requests.filter(r =>
-      r.landCode.toLowerCase().includes(q) ||
-      r.buyerName.toLowerCase().includes(q) ||
-      r.transferType.toLowerCase().includes(q)
-    );
-  };
-
-  const pendingRequests = filterRequests(mockTransferRequests.filter(r => r.status === "pending"));
-  const ongoingRequests = filterRequests(mockTransferRequests.filter(r => ["notary_verified","fee_pending","site_visit","published"].includes(r.status)));
-
-  const handleVerify = (id) => {
-    setSelectedRequestId(id);
-    setVerificationStartStep(1);
-    setIsVerifyOpen(true);
-  };
-
-  const handleStatusAction = (request) => {
-    if (request.status === "fee_pending") {
-      setSelectedRequestId(request.id);
-      setVerificationStartStep(4);
-      setIsVerifyOpen(true); 
-    } else {
-      setStatusModal({ type: request.status, requestId: request.id });
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/transfer/my-transfers');
+      if (res.data.success) setRequests(res.data.data);
+    } catch (err) {
+      toast.error("Failed to fetch requests");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleViewDetails = (request) => {
-    setCaseSummaryModal(request);
+  const fetchLros = async () => {
+    try {
+      const res = await api.get('/users/recipients?role=LRO');
+      if (res.data.success) setLros(res.data.data);
+    } catch (err) {
+      console.error("Failed to fetch LROs");
+    }
   };
 
-  const handleViewDoc = (doc) => {
-    setSelectedDoc(doc);
-    setIsPreviewOpen(true);
-  };
+  useEffect(() => {
+    fetchRequests();
+    fetchLros();
+  }, []);
 
-  const handleDownloadDoc = (doc) => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1500)),
-      {
-        loading: `Preparing ${doc.name || doc} for download...`,
-        success: `${doc.name || doc} downloaded successfully!`,
-        error: 'Failed to download document.',
+  const handleUpdateStatus = async (requestId, status, additionalData = {}) => {
+    try {
+      const formData = new FormData();
+      formData.append('status', status);
+      
+      if (additionalData.feeNotice) {
+        formData.append('feeNotice[amount]', additionalData.feeNotice.amount);
+        formData.append('feeNotice[description]', additionalData.feeNotice.description);
       }
-    );
+      
+      if (additionalData.buyerDocuments) {
+        additionalData.buyerDocuments.forEach(file => {
+          formData.append('attachments', file);
+        });
+      }
+
+      if (additionalData.certifiedDocuments) {
+        additionalData.certifiedDocuments.forEach(file => {
+          formData.append('attachments', file);
+        });
+      }
+      
+      if (additionalData.lroId) {
+        formData.append('lroId', additionalData.lroId);
+      }
+
+      const res = await api.patch(`/transfer/${requestId}/status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (res.data.success) {
+        toast.success(`Application updated to ${status.replace(/_/g, ' ')}`);
+        fetchRequests();
+        setIsVerificationOpen(false);
+        setIsFeeModalOpen(false);
+        setIsForwardModalOpen(false);
+        setIsPaymentReceivedModalOpen(false);
+        // Reset file states
+        setBuyerDocs([]);
+        setCertifiedDocs([]);
+      }
+    } catch (err) {
+      toast.error("Action failed");
+    }
   };
+
+  const filteredRequests = requests.filter(r => 
+    (r.plot?.landCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    `${r.sender?.firstName} ${r.sender?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const pendingQueue = filteredRequests.filter(r => r.status === 'Initiated');
+  const ongoingCases = filteredRequests.filter(r => ['Under_Verification', 'Awaiting_Fee_Payment', 'Payment_Submitted', 'Payment_Verified'].includes(r.status));
 
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-['Syne']">Notary Officer Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Chamber of Notaries - Jurisdiction: Douala I
-          </p>
+          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147]">Notary Officer Portal</h1>
+          <p className="text-muted-foreground mt-1">Legitimize and verify regional land transactions.</p>
         </div>
         <div className="flex gap-3">
-          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 px-4 py-2">
-            <ShieldCheck className="w-4 h-4 mr-2" />
-            License Active: 2026/001
+          <Badge className="bg-blue-50 text-blue-700 border-blue-200 px-4 py-2 font-bold uppercase tracking-wider text-[10px]">
+            <ShieldCheck className="w-4 h-4 mr-2" /> Regional Authority
           </Badge>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Queue */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xl font-bold font-['Syne']">Verification Queue</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-3 space-y-6">
+          
+          {/* Ongoing Cases */}
+          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white">
+            <CardHeader className="border-b bg-muted/30 py-4 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2">
+                  <Timer className="w-5 h-5 text-emerald-600" /> Ongoing Cases &amp; Verifications
+                </CardTitle>
+                <CardDescription>Applications currently under your supervision.</CardDescription>
+              </div>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by code, buyer, type..."
-                  className="pl-10 h-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                <Input placeholder="Search dossiers..." className="pl-10 h-9 rounded-xl text-xs" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {pendingRequests.map((request) => (
-                  <div key={request.id} className="flex flex-col p-4 rounded-xl border border-border hover:border-emerald-500/50 hover:bg-accent/5 transition-all group">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-[var(--terra-navy)]/10 flex items-center justify-center">
-                          <FileSignature className="w-6 h-6 text-[var(--terra-navy)] dark:text-white" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">New Transfer Request</p>
-                          <h4 className="font-bold text-lg mt-0.5">{request.landCode}</h4>
-                        </div>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {ongoingCases.map(req => (
+                  <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
+                        req.status === 'Payment_Submitted' || req.status === 'Payment_Verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                      }`}>
+                        {req.status === 'Payment_Submitted' || req.status === 'Payment_Verified' ? <FileCheck className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
                       </div>
-                      <Badge className="bg-blue-100 text-blue-700 border-0">Awaiting Review</Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 mt-4 py-4 border-y border-border">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-full bg-muted">
-                          <FileText className="w-3.5 h-3.5" />
+                      <div>
+                        <h4 className="font-bold text-[#002147] group-hover:text-emerald-600 transition-colors">{req.plot.landCode}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge className={cn("text-[9px] uppercase border-none", 
+                            req.status === 'Payment_Verified' ? "bg-emerald-600 text-white" : 
+                            req.status === 'Payment_Submitted' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                          )}>
+                            {req.status.replace(/_/g, ' ')}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium italic">Buyer: {req.receiver.firstName} {req.receiver.lastName}</span>
                         </div>
-                        <span className="text-sm font-medium">Buyer: {request.buyerName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-full bg-muted">
-                          <Clock className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="text-sm text-muted-foreground">Submitted: 2 hours ago</span>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="w-7 h-7 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[10px] font-bold">
-                            DOC
-                          </div>
-                        ))}
-                        <span className="ml-4 text-xs text-muted-foreground self-center">+2 more docs</span>
-                      </div>
-                      <Button 
-                        onClick={() => handleVerify(request.id)}
-                        className="bg-[var(--terra-emerald)] hover:bg-emerald-600 gap-2"
-                      >
-                        Start Verification
-                      </Button>
+                    <div className="flex items-center gap-3">
+                      {req.status === 'Under_Verification' && (
+                        <Button onClick={() => { setSelectedRequest(req); setIsFeeModalOpen(true); }} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Prepare Fee Notice</Button>
+                      )}
+                      {req.status === 'Awaiting_Fee_Payment' && (
+                        <Button onClick={() => { setSelectedRequest(req); setIsPaymentReceivedModalOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Payment Received</Button>
+                      )}
+                      {req.status === 'Payment_Submitted' && (
+                        <Button onClick={() => { setSelectedRequest(req); setIsPaymentReceivedModalOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold">Verify &amp; Add Docs</Button>
+                      )}
+                      {req.status === 'Payment_Verified' && (
+                        <Button onClick={() => { setSelectedRequest(req); setIsForwardModalOpen(true); }} className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white rounded-lg h-9 px-6 font-bold flex items-center gap-2">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
+                      )}
+                      <Button variant="ghost" size="icon" onClick={() => { setSelectedRequest(req); setIsDetailsOpen(true); }} className="h-9 w-9 text-blue-600 hover:bg-blue-50 border border-blue-100 rounded-lg"><Eye className="w-4 h-4" /></Button>
                     </div>
                   </div>
                 ))}
+                {ongoingCases.length === 0 && <div className="p-12 text-center text-muted-foreground text-sm">No ongoing cases in your region.</div>}
               </div>
             </CardContent>
           </Card>
 
-          {/* Ongoing Cases */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl font-bold font-['Syne']">Ongoing Cases</CardTitle>
+          {/* Verification Queue (New Requests) */}
+          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white/50 backdrop-blur-sm">
+            <CardHeader className="bg-muted/20 py-4 border-b">
+              <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2 text-blue-800">
+                <FileSignature className="w-5 h-5" /> Incoming Requests Queue
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {ongoingRequests.map((request) => {
-                  const plot = mockLandPlots.find(p => p.landCode === request.landCode);
-                  return (
-                    <div key={request.id} className="p-4 rounded-xl border border-border bg-white dark:bg-white/5 hover:shadow-md transition-all group relative">
-                      <div className="flex justify-between items-start mb-3">
-                        <Badge className={`text-[10px] py-0 px-2 uppercase border-none ${
-                          request.status === 'published' ? "bg-amber-100 text-amber-700" :
-                          request.status === 'notary_verified' ? "bg-emerald-100 text-emerald-700" :
-                          "bg-blue-100 text-blue-700"
-                        }`}>
-                          {request.status.replace('_', ' ')}
-                        </Badge>
-                        <span className="text-[10px] text-muted-foreground font-mono">ID: #OWN-{plot?.ownerCNI || request.id}</span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-bold font-mono text-sm">{request.landCode}</p>
-                          <p className="text-xs text-muted-foreground mt-1">Buyer: {request.buyerName}</p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-[var(--terra-navy)] hover:bg-[var(--terra-navy)]/5"
-                            onClick={() => handleViewDetails(request)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-[var(--terra-emerald)] hover:bg-[var(--terra-emerald)]/5"
-                            onClick={() => handleStatusAction(request)}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full bg-muted h-1.5 rounded-full mt-4 overflow-hidden">
-                        <div 
-                          className="bg-[var(--terra-emerald)] h-full transition-all duration-1000" 
-                          style={{ width: request.status === "published" ? "80%" : request.status === "notary_verified" ? "100%" : "40%" }}
-                        />
-                      </div>
+            <CardContent className="p-0">
+               <div className="divide-y divide-border/50">
+                  {pendingQueue.map(req => (
+                    <div key={req._id} className="p-5 flex items-center justify-between hover:bg-white transition-all">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600"><FileText className="w-5 h-5" /></div>
+                          <div>
+                             <h4 className="font-bold text-sm">{req.plot.landCode}</h4>
+                             <p className="text-[10px] text-muted-foreground">Submitted by {req.sender.firstName} {req.sender.lastName} · {new Date(req.createdAt).toLocaleDateString()}</p>
+                          </div>
+                       </div>
+                       <Button onClick={() => handleUpdateStatus(req._id, 'Under_Verification')} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-lg px-4 text-xs font-bold">Initiate Verification</Button>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                  {pendingQueue.length === 0 && <div className="p-8 text-center text-muted-foreground text-xs italic">All new requests have been processed.</div>}
+               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Status Action Modals */}
-        <Dialog open={!!statusModal.type} onOpenChange={() => setStatusModal({ type: null, requestId: null })}>
-          <DialogContent className="max-w-md">
-            {statusModal.type === "published" && (
-              <div className="py-6 text-center space-y-6">
-                <div className="flex justify-center">
-                  <div className="relative w-32 h-32 flex items-center justify-center">
-                    <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/20" />
-                      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="283" strokeDashoffset="70" className="text-amber-500 transition-all duration-1000" />
-                    </svg>
-                    <div className="flex flex-col items-center">
-                      <span className="text-2xl font-black text-[#002147]">22</span>
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Days Left</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <DialogTitle className="text-xl font-bold font-['Syne']">Public Notice Countdown</DialogTitle>
-                  <DialogDescription>
-                    The 30-day public notice for this plot is currently active. 
-                    Oppositions can be filed until June 10, 2024.
-                  </DialogDescription>
-                </div>
-                <Button onClick={() => setStatusModal({ type: null, requestId: null })} className="w-full bg-[var(--terra-navy)] text-white">
-                  Close Monitoring
-                </Button>
-              </div>
-            )}
-
-            {statusModal.type === "notary_verified" && (
-              <div className="py-8 text-center space-y-6">
-                <div className="flex justify-center">
-                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-                    <CheckCircle2 className="w-10 h-10" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <DialogTitle className="text-2xl font-bold font-['Syne']">Verification Completed</DialogTitle>
-                  <DialogDescription className="text-base">
-                    This case has been fully verified and signed by the Notary. 
-                    All documents are ready for final LRO validation.
-                  </DialogDescription>
-                </div>
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-emerald-700 text-sm italic">
-                  "Authenticity of deed and identity of parties confirmed."
-                </div>
-                <Button onClick={() => setStatusModal({ type: null, requestId: null })} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
-                  Back to Dashboard
-                </Button>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Case Summary Modal */}
-        <Dialog open={!!caseSummaryModal} onOpenChange={() => setCaseSummaryModal(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold font-['Syne']">Case File Summary</DialogTitle>
-              <DialogDescription>
-                Secure digital dossier for plot {caseSummaryModal?.landCode}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-4 bg-muted/40 p-4 rounded-xl border text-sm">
-                <div className="space-y-1">
-                  <p className="text-muted-foreground">Request ID</p>
-                  <p className="font-mono font-bold">{caseSummaryModal?.id?.toUpperCase()}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground">Submitted On</p>
-                  <p className="font-bold">{caseSummaryModal?.submittedAt}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground">Buyer Name</p>
-                  <p className="font-bold">{caseSummaryModal?.buyerName}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-muted-foreground">Status</p>
-                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none capitalize">
-                    {caseSummaryModal?.status?.replace('_', ' ')}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-bold text-sm flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[var(--terra-emerald)]" />
-                  Verified Case Documents
-                </h4>
-                <div className="space-y-2">
-                  {[
-                    { name: "Buyer Identity (CNI)", type: "PDF", size: "1.2 MB" },
-                    { name: "Signed Deed of Sale", type: "PDF", size: "2.4 MB" },
-                    { name: "Land Title Extract", type: "PDF", size: "0.8 MB" },
-                    { name: "Registry Tax Receipt", type: "PDF", size: "0.5 MB" }
-                  ].map((doc, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 rounded-xl border bg-white hover:bg-gray-50 transition-colors group">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                        <FileText className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate">{doc.name}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">{doc.type} · {doc.size}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                          onClick={() => handleViewDoc(doc)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
-                          onClick={() => handleDownloadDoc(doc)}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button onClick={() => setCaseSummaryModal(null)} className="w-full bg-[var(--terra-navy)] text-white h-11 rounded-xl">
-                Close Case File
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Legal Resources */}
+        {/* Sidebar Info */}
         <div className="space-y-6">
-          <Card className="bg-[var(--terra-navy)] text-white overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <Gavel className="w-24 h-24" />
-            </div>
-            <CardHeader>
-              <CardTitle className="text-xl font-bold font-['Syne']">Legal Compliance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 rounded-lg bg-white/10 border border-white/10">
-                <p className="text-xs font-semibold text-emerald-400 mb-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  NEW REGULATION
-                </p>
-                <p className="text-sm font-medium">Updated 2026 Land Transfer Act (Section 4.2)</p>
-                <p className="text-xs text-white/50 mt-1">Mandatory digital witness signatures required for all deeds.</p>
-              </div>
-              <Button variant="secondary" className="w-full">View Legal Library</Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg font-bold font-['Syne']">Upcoming Appointments</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { name: "John Doe", type: "Deed Signing", time: "09:00 AM" },
-                { name: "Alice Smith", type: "Doc Review", time: "11:30 AM" },
-                { name: "Robert Ngollo", type: "Inheritance", time: "02:15 PM" },
-              ].map((apt, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                  <div>
-                    <p className="text-sm font-semibold">{apt.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{apt.type}</p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] tabular-nums">{apt.time}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+           <Card className="bg-gradient-to-br from-[#002147] to-blue-900 text-white border-none shadow-xl rounded-2xl">
+              <CardHeader><CardTitle className="text-lg font-bold font-['Syne']">Officer Protocol</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                 <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-[10px] font-black">1</div>
+                    <p className="text-xs opacity-80">Review client-submitted documents (CNI, Sale Deed) via the summary view.</p>
+                 </div>
+                 <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-[10px] font-black">2</div>
+                    <p className="text-xs opacity-80">Prepare Fee Notice and upload initial Buyer Drafts for client review.</p>
+                 </div>
+                 <div className="flex gap-3">
+                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 text-[10px] font-black">3</div>
+                    <p className="text-xs opacity-80">Upon payment verification, upload certified finalized documents and forward to LRO.</p>
+                 </div>
+              </CardContent>
+           </Card>
         </div>
       </div>
 
-      <VerificationModal 
-        requestId={selectedRequestId}
-        open={isVerifyOpen}
-        onClose={() => setIsVerifyOpen(false)}
-        startStep={verificationStartStep}
-      />
-
-      {/* Document Preview Modal */}
-      <Dialog open={isPreviewOpen} onOpenChange={(open) => {
-        setIsPreviewOpen(open);
-        if (!open) setIsFullScreen(false);
-      }}>
-        <DialogContent className={`${isFullScreen ? "max-w-[100vw] h-[100vh] w-[100vw]" : "max-width-4xl h-[80vh] w-[90vw]"} transition-all duration-300 p-0 overflow-hidden flex flex-col`}>
-          <DialogHeader className="p-4 border-b flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <FileText className="w-4 h-4" />
-              </div>
-              <div>
-                <DialogTitle className="text-sm font-bold">{selectedDoc?.name || selectedDoc}</DialogTitle>
-                <DialogDescription className="text-[10px]">Secure Document Preview · Verified by TerraTrace</DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pr-8">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => setIsFullScreen(!isFullScreen)}
-              >
-                <Maximize2 className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={() => handleDownloadDoc(selectedDoc)}
-              >
-                <Download className="w-4 h-4" />
-              </Button>
-            </div>
+      {/* Summary / Details Modal */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-2xl rounded-2xl">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
+              <Maximize2 className="w-5 h-5 text-emerald-500" /> Dossier Summary: {selectedRequest?.plot.landCode}
+            </DialogTitle>
+            <DialogDescription>Overview of all documents submitted and generated for this transaction.</DialogDescription>
           </DialogHeader>
-          <div className="flex-1 bg-gray-100 p-4 flex justify-center overflow-auto">
-            <div className={`bg-white shadow-2xl w-full max-w-[800px] h-fit min-h-full p-12 border-t-4 border-[var(--terra-emerald)] transition-all ${isFullScreen ? "scale-105" : ""}`}>
-              {/* Mock PDF Content */}
-              <div className="flex justify-between items-start mb-12">
-                <div className="space-y-1">
-                  <h1 className="text-2xl font-bold uppercase tracking-tighter text-[#002147]">Republic of Cameroon</h1>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-[0.2em]">Peace - Work - Fatherland</p>
-                  <div className="w-12 h-1 bg-emerald-500 mt-2" />
-                </div>
-                <div className="text-right">
-                  <p className="font-mono text-sm font-bold text-emerald-700">DOC-REF: {Math.random().toString(36).substring(7).toUpperCase()}</p>
-                  <p className="text-[10px] text-muted-foreground">Certified on: 2024-05-24</p>
-                </div>
-              </div>
-              
-              <div className="text-center mb-12">
-                <h2 className="text-xl font-black underline decoration-2 underline-offset-8 uppercase text-[#002147] tracking-widest">{selectedDoc?.name || selectedDoc}</h2>
-              </div>
+          <div className="space-y-6 py-4 overflow-y-auto max-h-[70vh] pr-2">
+             <div className="grid grid-cols-3 gap-4 bg-muted/40 p-4 rounded-xl">
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Plot Code</Label><p className="font-bold text-sm">{selectedRequest?.plot.landCode}</p></div>
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Initiator</Label><p className="font-bold text-sm">{selectedRequest?.sender.firstName} {selectedRequest?.sender.lastName}</p></div>
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Type</Label><Badge className="bg-blue-100 text-blue-700 border-none uppercase text-[9px]">{selectedRequest?.transferType}</Badge></div>
+             </div>
 
-              <div className="space-y-6 text-sm leading-loose text-gray-700">
-                <p>This document serves as an official certified digital copy of the <strong>{selectedDoc?.name || selectedDoc}</strong> related to the land transfer request for plot <strong>{caseSummaryModal?.landCode}</strong>.</p>
-                <p>The parties involved, {caseSummaryModal?.buyerName} (Buyer) and the registered landowner, have duly submitted this document through the TerraTrace secure portal. It has been cryptographically signed and verified against the National Civil Registry.</p>
-                
-                <div className="py-12 border-y border-dashed border-gray-200 my-8">
-                  <div className="h-64 bg-gray-50/50 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200 relative overflow-hidden group">
-                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20 pointer-events-none" />
-                     <FileText className="w-16 h-16 text-emerald-100 mb-4 group-hover:scale-110 transition-transform" />
-                     <p className="text-xs text-gray-400 font-medium italic">High-Resolution Document Scan Preview</p>
-                     <Badge variant="secondary" className="mt-4 bg-emerald-50 text-emerald-700 border-emerald-100">AUTHENTICATED</Badge>
+             <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                   <h4 className="font-bold text-sm flex items-center gap-2"><UserCheck className="w-4 h-4 text-blue-600" /> Client Documents</h4>
+                   <Badge variant="outline" className="text-[9px]">{selectedRequest?.clientDocuments?.length} Files</Badge>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                   {selectedRequest?.clientDocuments?.map((doc, i) => (
+                     <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-white shadow-sm hover:shadow-md transition-all">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                           <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+                           <span className="text-xs font-bold truncate">{doc.split('/').pop()}</span>
+                        </div>
+                        <div className="flex gap-2">
+                           <a href={`http://localhost:5001${doc}`} target="_blank" className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"><Eye className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                        </div>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             {(selectedRequest?.buyerDocuments?.length > 0 || selectedRequest?.certifiedDocuments?.length > 0) && (
+               <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2 pt-4">
+                     <h4 className="font-bold text-sm flex items-center gap-2 text-emerald-600"><ShieldCheck className="w-4 h-4" /> Notary Certified Dossier</h4>
+                     <Badge className="bg-emerald-100 text-emerald-700 border-none text-[9px]">Verified</Badge>
                   </div>
-                </div>
-
-                <p>Any falsification of this document is subject to prosecution under the Land Management Act 2023. The validity of this digital copy is equivalent to the physical original as per Law No. 2023/007 on Digital Transactions.</p>
-              </div>
-
-              <div className="mt-20 flex justify-between items-end">
-                <div className="space-y-4">
-                  <div className="w-32 h-32 border-4 border-emerald-500 bg-white p-2 flex items-center justify-center">
-                    {/* Placeholder for QR code */}
-                    <div className="grid grid-cols-6 gap-0.5 opacity-80">
-                      {[...Array(36)].map((_, i) => <div key={i} className={`w-3 h-3 ${Math.random() > 0.5 ? "bg-[#002147]" : "bg-transparent"}`} />)}
-                    </div>
+                  <div className="grid grid-cols-1 gap-2">
+                     {[...(selectedRequest?.buyerDocuments || []), ...(selectedRequest?.certifiedDocuments || [])].map((doc, i) => (
+                       <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/20 border-emerald-100">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                             <FileCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                             <span className="text-xs font-bold truncate italic">{doc.split('/').pop()}</span>
+                          </div>
+                          <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                       </div>
+                     ))}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Scan to verify authenticity</p>
+               </div>
+             )}
+
+             {selectedRequest?.paymentReceipt && (
+               <div className="space-y-4 pt-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                     <h4 className="font-bold text-sm flex items-center gap-2 text-amber-600"><CreditCard className="w-4 h-4" /> Payment Receipt</h4>
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-xl border bg-amber-50/30 border-amber-100">
+                     <div className="flex items-center gap-3">
+                        <Badge className="bg-amber-500 text-white p-2 rounded-lg"><CheckCircle2 className="w-4 h-4" /></Badge>
+                        <div>
+                           <p className="text-xs font-bold">Proof of Payment</p>
+                           <p className="text-[10px] text-muted-foreground">Uploaded by client</p>
+                        </div>
+                     </div>
+                     <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="flex items-center gap-2 px-4 py-2 bg-white text-amber-600 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-50 transition-colors"><Download className="w-4 h-4" /> Save Receipt</a>
+                  </div>
+               </div>
+             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Received Modal */}
+      <Dialog open={isPaymentReceivedModalOpen} onOpenChange={setIsPaymentReceivedModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="w-5 h-5" /> Payment Verification &amp; Certification
+            </DialogTitle>
+            <DialogDescription>Confirm processing fee receipt and upload the final certified land transfer documents.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm"><CreditCard className="w-5 h-5 text-emerald-600" /></div>
+                <div>
+                   <p className="text-xs font-bold text-emerald-800">Verify Processing Fee</p>
+                   <p className="text-[10px] text-emerald-600 opacity-80">Ensure the amount matches the fee notice sent to the client.</p>
                 </div>
-                <div className="text-right space-y-3">
-                   <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Signed by</p>
-                      <p className="font-['Syne'] font-black text-[#002147]">TerraTrace Authority</p>
+             </div>
+             
+             <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Final Certified Documents</Label>
+                <div className="relative">
+                   <div onClick={() => document.getElementById('certified_upload').click()} className="border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/30 transition-all">
+                      <UploadIcon className="w-8 h-8 text-muted-foreground" />
+                      <div className="text-center">
+                         <p className="text-sm font-bold">Upload Certified Deed &amp; Dossier</p>
+                         <p className="text-[10px] text-muted-foreground">PDF, JPG, or PNG (Multiple allowed)</p>
+                      </div>
                    </div>
-                   <div className="w-48 h-0.5 bg-gray-200 ml-auto" />
-                   <p className="text-[8px] uppercase font-bold tracking-[0.3em] text-emerald-600">Secure Digital Registry</p>
+                   <input 
+                     id="certified_upload" 
+                     type="file" 
+                     multiple 
+                     className="hidden" 
+                     onChange={(e) => setCertifiedDocs(Array.from(e.target.files))} 
+                   />
                 </div>
-              </div>
-            </div>
+                {certifiedDocs.length > 0 && (
+                   <div className="flex flex-wrap gap-2 pt-2">
+                      {certifiedDocs.map((f, i) => (
+                        <Badge key={i} variant="secondary" className="text-[9px] gap-1 px-2 py-1 bg-white border border-emerald-200">
+                           <FileCheck className="w-3 h-3 text-emerald-600" /> {f.name}
+                           <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i))} />
+                        </Badge>
+                      ))}
+                   </div>
+                )}
+             </div>
           </div>
-          <div className="p-4 border-t bg-white flex justify-end gap-3">
-             <Button variant="ghost" onClick={() => setIsPreviewOpen(false)} className="rounded-xl px-8 h-11">Close Preview</Button>
-             <Button onClick={() => handleDownloadDoc(selectedDoc)} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white rounded-xl px-8 h-11 font-bold gap-2">
-                <Download className="w-4 h-4" /> Download PDF
+          <DialogFooter>
+             <Button 
+               disabled={certifiedDocs.length === 0}
+               onClick={() => handleUpdateStatus(selectedRequest._id, 'Payment_Verified', { certifiedDocuments: certifiedDocs })} 
+               className="bg-emerald-600 hover:bg-emerald-700 text-white w-full h-12 rounded-xl font-bold uppercase tracking-widest text-xs"
+             >
+                Confirm Payment &amp; Certify Dossier
              </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Other Modals (Fee, Forward) */}
+      <Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Prepare Fee Notice</DialogTitle>
+            <DialogDescription>Set the processing fee and upload draft buyer documents.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <Label>Fee Amount (CFA)</Label>
+                <Input type="number" placeholder="50000" value={feeAmount} onChange={e => setFeeAmount(e.target.value)} className="rounded-xl" />
+             </div>
+             <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea placeholder="Registration fees and notary charges..." value={feeDesc} onChange={e => setFeeDesc(e.target.value)} className="rounded-xl" />
+             </div>
+             <div className="space-y-2">
+                <Label>Draft Documents (Review copies)</Label>
+                <Input type="file" multiple onChange={e => setBuyerDocs(Array.from(e.target.files))} className="h-11 border-dashed pt-2.5 rounded-xl" />
+             </div>
           </div>
+          <DialogFooter>
+             <Button onClick={() => handleUpdateStatus(selectedRequest._id, 'Awaiting_Fee_Payment', { 
+               feeNotice: { amount: feeAmount, description: feeDesc },
+               buyerDocuments: buyerDocs
+             })} className="bg-emerald-600 hover:bg-emerald-700 text-white w-full h-12 rounded-xl font-bold">Send Fee Notice to Client</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isForwardModalOpen} onOpenChange={setIsForwardModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Regional Registry Forwarding</DialogTitle>
+            <DialogDescription>Select the LRO in the appropriate region for final code issuance.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+             <div className="space-y-2">
+                <Label>Regional Registry Officer</Label>
+                <Select value={selectedLro} onValueChange={setSelectedLro}>
+                   <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Choose Regional LRO..." /></SelectTrigger>
+                   <SelectContent>
+                      {lros.map(l => (
+                        <SelectItem key={l._id} value={l._id}>{l.firstName} {l.lastName} — {l.jurisdiction}</SelectItem>
+                      ))}
+                   </SelectContent>
+                </Select>
+             </div>
+             <div className="bg-blue-50 p-4 rounded-xl text-xs text-blue-700 italic border border-blue-100 flex gap-2">
+                <ShieldCheck className="w-5 h-5 shrink-0 opacity-50" />
+                "By forwarding, you certify that the transaction is legally valid and the dossier is complete for final registry entry."
+             </div>
+          </div>
+          <DialogFooter>
+             <Button 
+               disabled={!selectedLro}
+               onClick={() => handleUpdateStatus(selectedRequest._id, 'Forwarded_to_LRO', { lroId: selectedLro })} 
+               className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white w-full h-12 rounded-xl font-bold gap-2 uppercase tracking-widest text-xs"
+             >
+                <Send className="w-4 h-4" /> Authorize &amp; Forward to Registry
+             </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

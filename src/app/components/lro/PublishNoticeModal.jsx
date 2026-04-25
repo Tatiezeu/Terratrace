@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,21 +14,43 @@ import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
 
-export function PublishNoticeModal({ open, onClose }) {
-  const [formData, setFormData] = useState({
-    landCode: "",
-    publicationMessage: "",
-  });
+import api from "../../../utils/api";
 
-  const handleSubmit = () => {
-    toast.success("30-Day Public Notice Published!", {
-      description: `Notice for ${formData.landCode} has been published platform-wide. Any claims must be filed within 30 days.`,
-    });
-    onClose();
-    setFormData({
-      landCode: "",
-      publicationMessage: "",
-    });
+export function PublishNoticeModal({ open, onClose, request }) {
+  const [publicationMessage, setPublicationMessage] = useState("The land in question is about to be transferred.");
+  const [config, setConfig] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      api.get('/config').then(res => {
+        if (res.data.success) setConfig(res.data.data);
+      });
+    }
+  }, [open]);
+
+  const handleSubmit = async () => {
+    try {
+      const durationDays = config?.noticeDurationDays || 30;
+      const testMode = config?.noticeTestMode;
+      const testMinutes = config?.noticeTestMinutes || 10;
+
+      const durationMs = testMode 
+        ? testMinutes * 60 * 1000 
+        : durationDays * 24 * 60 * 60 * 1000;
+
+      await api.patch(`/transfer/${request._id}/status`, { 
+        status: 'Public_Notice',
+        feedback: publicationMessage,
+        publicNotice: {
+          startDate: new Date(),
+          endDate: new Date(Date.now() + durationMs)
+        }
+      });
+      toast.success("Public Notice Published Successfully!");
+      onClose();
+    } catch (err) {
+      toast.error("Failed to publish notice");
+    }
   };
 
   return (
@@ -56,37 +78,18 @@ export function PublishNoticeModal({ open, onClose }) {
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="landCode">Select Land Code</Label>
-            <Select
-              value={formData.landCode}
-              onValueChange={(value) => setFormData({ ...formData, landCode: value })}
-            >
-              <SelectTrigger id="landCode">
-                <SelectValue placeholder="Choose a land plot" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10005-D1-54323-003">
-                  10005-D1-54323-003 - Bafoussam, West
-                </SelectItem>
-                <SelectItem value="10005-D2-54322-002">
-                  10005-D2-54322-002 - Yaoundé, Centre
-                </SelectItem>
-                <SelectItem value="10005-D1-54321-001">
-                  10005-D1-54321-001 - Douala, Littoral
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="bg-muted p-4 rounded-xl">
+             <Label className="text-[10px] uppercase font-bold text-muted-foreground">Target Plot</Label>
+             <p className="font-mono font-bold text-blue-700">{request?.plot?.landCode}</p>
+             <p className="text-xs text-muted-foreground mt-1">{request?.plot?.location}</p>
           </div>
 
           <div>
             <Label htmlFor="message">Publication Message</Label>
             <Textarea
               id="message"
-              value={formData.publicationMessage}
-              onChange={(e) =>
-                setFormData({ ...formData, publicationMessage: e.target.value })
-              }
+              value={publicationMessage}
+              onChange={(e) => setPublicationMessage(e.target.value)}
               placeholder="Enter the public notice message..."
               rows={4}
               className="resize-none"
@@ -98,9 +101,8 @@ export function PublishNoticeModal({ open, onClose }) {
 
           <div className="bg-muted/50 rounded-lg p-3 border border-border">
             <p className="text-sm">
-              <span className="font-semibold">Publication Period:</span> 30 days from{" "}
-              {new Date().toLocaleDateString()} to{" "}
-              {new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}
+              <span className="font-semibold">Publication Period:</span> {config?.noticeTestMode ? `${config?.noticeTestMinutes} Minutes` : `${config?.noticeDurationDays || 30} Days`} (Expires:{" "}
+              {new Date(Date.now() + (config?.noticeTestMode ? (config?.noticeTestMinutes || 10) * 60 * 1000 : (config?.noticeDurationDays || 30) * 24 * 60 * 60 * 1000)).toLocaleDateString()})
             </p>
           </div>
         </div>

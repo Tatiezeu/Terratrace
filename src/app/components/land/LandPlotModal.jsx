@@ -174,17 +174,22 @@ export function LandPlotModal({ plot, open, onClose }) {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold text-foreground">{record.owner}</p>
-                        <Badge variant="outline" className="text-xs">
-                          {record.transferType}
+                        <p className="font-semibold text-foreground">
+                          {typeof record.owner === 'object' 
+                            ? `${record.owner?.firstName} ${record.owner?.lastName}` 
+                            : (record.owner || 'Previous Owner')}
+                        </p>
+                        <Badge variant="outline" className="text-[9px] uppercase font-bold text-emerald-600 bg-emerald-50 border-emerald-100">
+                          {record.transferType?.replace('_', ' ') || 'Transfer'}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {new Date(record.date).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        Owner from {record.acquiredDate ? new Date(record.acquiredDate).toLocaleDateString("en-GB", { day: 'numeric', month: 'long', year: 'numeric' }) : "Initial Registration"} 
+                        {" till "} 
+                        {new Date(record.transferDate).toLocaleDateString("en-GB", { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-1 font-mono uppercase tracking-tighter opacity-70">
+                        Archive Ref: {record.previousLandCode || "N/A"}
                       </p>
                     </div>
                   </div>

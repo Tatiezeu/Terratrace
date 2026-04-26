@@ -21,12 +21,14 @@ export default function AppLayout() {
     }
 
     if (rawUser) {
+      const avatarUrl = rawUser.profilePic 
+        ? (rawUser.profilePic.startsWith('http') ? rawUser.profilePic : `http://localhost:5001${rawUser.profilePic}`)
+        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`;
+
       setUser({
         role: rawUser.role,
         name: `${rawUser.firstName} ${rawUser.lastName}`,
-        avatar: rawUser.profilePic 
-            ? (rawUser.profilePic.startsWith('http') ? rawUser.profilePic : `http://localhost:5001${rawUser.profilePic}`)
-            : `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`,
+        avatar: `${avatarUrl}?t=${Date.now()}`,
       });
 
       const welcomeKey = `welcome_shown_${rawUser._id || rawUser.id}`;

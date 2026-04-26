@@ -26,6 +26,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -54,13 +56,12 @@ export default function LoginPage() {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(userData));
         
-        toast.success("Login Successful", {
-          description: `Welcome back, ${userData.firstName || "Officer"}!`,
-        });
+        setWelcomeName(userData.firstName || "Officer");
+        setShowSuccessOverlay(true);
         
         setTimeout(() => {
           window.location.href = "/dashboard";
-        }, 300);
+        }, 2500);
       }
     } catch (err) {
       console.error("Login detail:", err);
@@ -99,7 +100,40 @@ export default function LoginPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 font-['Montserrat']">
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 font-['Montserrat'] relative overflow-hidden">
+      <AnimatePresence>
+        {showSuccessOverlay && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="absolute inset-0 z-50 bg-[#002147] flex flex-col items-center justify-center text-white"
+          >
+            <motion.div 
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-col items-center"
+            >
+              <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-8 shadow-lg shadow-emerald-500/30">
+                <CheckCircle2 className="w-12 h-12 text-white" />
+              </div>
+              <h2 className="text-4xl font-bold font-['Syne'] mb-4 text-center">Login Successful</h2>
+              <p className="text-xl text-emerald-100/80 mb-8">Welcome back, {welcomeName}!</p>
+              <div className="w-48 h-1 bg-white/10 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 2, ease: "linear" }}
+                  className="h-full bg-emerald-500 rounded-full"
+                />
+              </div>
+              <p className="text-sm text-white/40 mt-4 uppercase tracking-widest font-bold">Redirecting to Dashboard...</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl w-full flex flex-col md:flex-row gap-0 overflow-hidden rounded-[2rem] shadow-2xl bg-white border border-gray-100">
         
         {/* Left Card: Information */}

@@ -16,7 +16,19 @@ export default function EmailVerificationPage() {
 
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const [resendCount, setResendCount] = useState(0);
   const inputsRef = useRef([]);
+
+  useEffect(() => {
+    let interval;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
 
   const handleChange = (index, value) => {
     if (value.length > 1) value = value[value.length - 1];
@@ -76,8 +88,32 @@ export default function EmailVerificationPage() {
     }
   };
 
-  const handleResend = () => {
-    toast.info("A new code has been sent to your email.");
+  const handleResend = async () => {
+    if (resendCount >= 3) {
+      toast.error("Maximum resends reached", {
+        description: "Please contact support for manual verification."
+      });
+      return;
+    }
+
+    if (timer > 0) return;
+
+    try {
+      const email = localStorage.getItem('temp_email');
+      if (!email) return toast.error("Email not found. Please sign up again.");
+
+      const response = await api.post('/auth/resend-code', { email });
+
+      if (response.data.success) {
+        setTimer(60);
+        setResendCount(prev => prev + 1);
+        toast.success("New Code Sent", {
+          description: `Check your inbox. (${3 - (resendCount + 1)} attempts remaining)`
+        });
+      }
+    } catch (err) {
+      toast.error("Failed to resend code");
+    }
   };
 
   return (
@@ -146,10 +182,19 @@ export default function EmailVerificationPage() {
             </p>
             <button 
               onClick={handleResend}
-              className="flex items-center gap-2 mx-auto text-emerald-600 font-bold text-sm hover:text-emerald-700 transition-colors"
+              disabled={timer > 0 || resendCount >= 3}
+              className={`flex items-center gap-2 mx-auto font-bold text-sm transition-colors ${
+                (timer > 0 || resendCount >= 3) 
+                  ? "text-gray-400 cursor-not-allowed" 
+                  : "text-emerald-600 hover:text-emerald-700"
+              }`}
             >
-              <RefreshCw className="w-4 h-4" />
-              Resend New Code
+              <RefreshCw className={`w-4 h-4 ${timer > 0 ? "animate-spin" : ""}`} />
+              {timer > 0 
+                ? `Resend in ${timer}s` 
+                : resendCount >= 3 
+                  ? "Max Resends Reached" 
+                  : "Resend New Code"}
             </button>
             <div className="pt-4 border-t border-gray-50">
               <Link to="/register" className="text-xs text-gray-400 font-bold hover:text-gray-600 flex items-center justify-center gap-2">

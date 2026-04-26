@@ -130,12 +130,18 @@ export function TransferRequestModal({ plot, open, onClose }) {
   };
 
   const handleSubmit = async () => {
+    if (portionType === "sub" && (parseFloat(formData.surfaceArea) >= plot.area)) {
+      return toast.error("Invalid Subdivision Area", {
+        description: `Area must be strictly less than the total ${plot.area}m²`
+      });
+    }
+
     try {
       const data = new FormData();
       data.append('plotId', plot._id);
       data.append('transferType', isDirectGrant ? 'direct_grant' : transferType);
-      data.append('portionType', portionType);
-      data.append('surfaceArea', portionType === "sub" ? formData.surfaceArea : plot.area);
+      data.append('isSubdivision', portionType === "sub");
+      data.append('transferArea', portionType === "sub" ? formData.surfaceArea : plot.area);
       data.append('notaryId', formData.notaryId);
       
       formData.cniFiles.forEach(f => data.append('attachments', f));

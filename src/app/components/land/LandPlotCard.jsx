@@ -1,6 +1,6 @@
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { MapPin, Shield, Eye, Lock, RefreshCw, Send, CheckCircle2 } from "lucide-react";
+import { MapPin, Shield, Eye, Lock, RefreshCw, Send, CheckCircle2, AlertTriangle } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "../ui/utils";
 import { useAuth } from "../../../context/AuthContext";
@@ -174,9 +174,8 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
               onClick={() => onInitiateTransfer(plot)}
               disabled={
                 isOwner || 
-                plot.status === 'under_review' || 
-                plot.status === 'pending' ||
-                (new Date() - new Date(plot.lastTransferDate) < 365 * 24 * 60 * 60 * 1000 && plot.status === 'transferred')
+                ['under_review', 'pending', 'under_transfer', 'Public_Notice'].includes(plot.status) ||
+                (plot.lastTransferDate && (new Date() - new Date(plot.lastTransferDate) < 365 * 24 * 60 * 60 * 1000) && plot.status === 'transferred')
               }
               className={cn("w-full text-white", isPublic ? "bg-[var(--terra-navy)] hover:bg-blue-900" : "bg-[var(--terra-emerald)] hover:bg-emerald-600")}
             >

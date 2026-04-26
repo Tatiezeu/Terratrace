@@ -130,18 +130,23 @@ export default function LRODashboard() {
     }
   };
 
-  const handleToggleDispute = async (plotId, currentStatus) => {
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeTarget, setDisputeTarget] = useState(null);
+
+  const handleToggleDispute = async () => {
     try {
-        const newStatus = currentStatus === 'disputed' ? 'cleared' : 'disputed';
-        const feedback = prompt(`Changing status to ${newStatus}. Enter reason:`);
-        if (feedback === null) return;
+        if (!disputeReason) return toast.error("Please provide a reason");
+        const newStatus = disputeTarget.status === 'disputed' ? 'cleared' : 'disputed';
         
-        await api.patch(`/transfer/plot/${plotId}/dispute`, { 
+        await api.patch(`/transfer/plot/${disputeTarget.id}/dispute`, { 
             status: newStatus,
-            feedback 
+            feedback: disputeReason 
         });
         toast.success(`Plot marked as ${newStatus}`);
         fetchData();
+        setIsDisputeModalOpen(false);
+        setDisputeReason("");
     } catch (err) {
         toast.error("Status update failed");
     }
@@ -181,14 +186,28 @@ export default function LRODashboard() {
                     <div className="flex items-center gap-2">
                       <h4 className="font-bold text-[#002147]">{req.plot?.landCode}</h4>
                       <Badge className={cn(
-                        "border-none text-[9px] uppercase",
-                        req.status === 'Completed' ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                        "border-none text-[9px] uppercase font-black px-2 py-0.5",
+                        req.status === 'Completed' 
+                          ? "bg-emerald-100 text-emerald-700" 
+                          : req.transferType === 'direct_grant'
+                            ? "bg-purple-600 text-white shadow-sm"
+                            : (req.plot?.status === 'disputed' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")
                       )}>
-                        {req.status === 'Completed' ? "Authorized & Completed" : "Review Pending"}
+                        {req.status === 'Completed' 
+                          ? "Authorized & Completed" 
+                          : req.transferType === 'direct_grant'
+                            ? "DIRECT GRANT"
+                            : (req.plot?.status === 'disputed' ? "BLOCKED (DISPUTED)" : "Review Pending")}
+                      </Badge>
+                      <Badge variant="outline" className="text-[8px] border-blue-200 text-blue-600 bg-blue-50/50">
+                         {req.isSubdivision ? `SUB PORTION (${req.transferArea}m²)` : "FULL PORTION"}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Notary: {req.notary?.firstName || "Unknown"} {req.notary?.lastName || ""} · 
+                    <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                      {req.transferType === 'direct_grant' 
+                        ? `Application Type: Direct State Grant`
+                        : `Transfer: ${req.transferType?.toUpperCase() || "PURCHASE"} via Notary ${req.notary?.lastName || ""}`}
+                      <span className="mx-1">·</span>
                       Buyer: {req.receiver?.firstName || "Unknown"} {req.receiver?.lastName || ""}
                     </p>
                   </div>
@@ -247,9 +266,9 @@ export default function LRODashboard() {
                    <Button 
                      variant="outline" 
                      size="sm" 
-                     disabled={!['under_review', 'under_transfer'].includes(plot.status)}
-                     onClick={() => handleToggleDispute(plot._id, plot.status)}
-                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 text-amber-700", plot.status === 'disputed' && "bg-amber-600 text-white border-none", !['under_review', 'under_transfer'].includes(plot.status) && plot.status !== 'disputed' && "opacity-30 cursor-not-allowed")}
+                     disabled={!['under_review', 'under_transfer', 'disputed'].includes(plot.status)}
+                     onClick={() => { setDisputeTarget({ id: plot._id, status: plot.status, code: plot.landCode }); setIsDisputeModalOpen(true); }}
+                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 text-amber-700", plot.status === 'disputed' && "bg-amber-600 text-white border-none", !['under_review', 'under_transfer', 'disputed'].includes(plot.status) && "opacity-30 cursor-not-allowed")}
                    >
                      <AlertTriangle className="w-3.5 h-3.5" />
                      {plot.status === 'disputed' ? 'Lift Dispute' : 'Dispute Land'}
@@ -383,31 +402,47 @@ export default function LRODashboard() {
                 <>
                    <Button 
                       variant="outline" 
+                      disabled={selectedRequest?.status === 'Public_Notice' || selectedRequest?.status === 'Under_Verification'}
                       onClick={() => setIsRejectModalOpen(true)} 
-                      className="rounded-lg h-10 px-4 border text-red-600 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest"
+                      className="rounded-lg h-10 px-4 border text-red-600 hover:bg-red-50 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                    >
                       Reject Dossier
                    </Button>
                    
-                   {selectedRequest?.status !== 'Public_Notice' ? (
+                   {selectedRequest?.status !== 'Public_Notice' && selectedRequest?.status !== 'Under_Verification' ? (
                       <Button 
                         onClick={() => { setIsPublishOpen(true); setIsApprovalOpen(false); }} 
                         className="bg-blue-600 hover:bg-blue-700 text-white flex-1 h-10 rounded-lg font-bold uppercase tracking-widest text-[10px]"
                       >
                          Publish Notice
                       </Button>
+                   ) : selectedRequest?.status === 'Public_Notice' ? (
+                      <div className={cn(
+                        "flex-1 flex items-center justify-center rounded-lg border",
+                        new Date(selectedRequest.publicNotice?.endDate) < new Date() ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
+                      )}>
+                         <Badge className={cn(
+                           "text-[9px] uppercase font-black",
+                           new Date(selectedRequest.publicNotice?.endDate) < new Date() ? "bg-red-500 text-white" : "bg-amber-500 text-white"
+                         )}>
+                            {new Date(selectedRequest.publicNotice?.endDate) < new Date() ? "Notice Expired" : "Notice Active"}
+                         </Badge>
+                      </div>
                    ) : (
-                      <div className="flex-1 flex items-center justify-center bg-amber-50 rounded-lg border border-amber-200">
-                         <Badge className="bg-amber-500 text-white text-[9px] uppercase font-black">Notice Active</Badge>
+                      <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
+                         <Badge className="bg-gray-500 text-white text-[9px] uppercase font-black">Returned</Badge>
                       </div>
                    )}
 
                    <Button 
-                      disabled={selectedRequest?.status === 'Public_Notice' && selectedRequest?.publicNotice?.endDate && new Date() < new Date(selectedRequest.publicNotice.endDate)}
+                      disabled={
+                        (selectedRequest?.status === 'Public_Notice' && selectedRequest?.publicNotice?.endDate && new Date() < new Date(selectedRequest.publicNotice.endDate)) ||
+                        selectedRequest?.plot?.status === 'disputed'
+                      }
                       onClick={() => handleAuthorize(selectedRequest._id)} 
                       className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 h-10 rounded-lg font-black shadow-lg shadow-emerald-500/20 uppercase tracking-widest text-[10px] disabled:opacity-50"
                    >
-                      Authorize Transfer
+                      {selectedRequest?.plot?.status === 'disputed' ? 'LOCKED (DISPUTED)' : 'Authorize Transfer'}
                    </Button>
                 </>
              )}
@@ -441,6 +476,46 @@ export default function LRODashboard() {
                className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
              >
                 Confirm Rejection &amp; Return
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DISPUTE CONFIRMATION MODAL */}
+      <Dialog open={isDisputeModalOpen} onOpenChange={setIsDisputeModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className={cn("text-xl font-bold font-['Syne']", disputeTarget?.status === 'disputed' ? "text-emerald-700" : "text-amber-700")}>
+               {disputeTarget?.status === 'disputed' ? 'Lift Land Dispute' : 'Initiate Land Dispute'}
+            </DialogTitle>
+            <DialogDescription>
+               Plot: <span className="font-mono font-bold">{disputeTarget?.code}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+             <div className={cn("p-3 rounded-xl border text-xs", disputeTarget?.status === 'disputed' ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700")}>
+                {disputeTarget?.status === 'disputed' 
+                  ? "Are you sure you want to lift the dispute? This will allow administrative processes to resume." 
+                  : "Marking this land as 'Disputed' will block any ongoing transfers or authorizations immediately."}
+             </div>
+             <div className="space-y-2">
+                <Label htmlFor="disputeReason" className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Administrative Reason / Feedback</Label>
+                <Textarea 
+                  id="disputeReason" 
+                  placeholder={disputeTarget?.status === 'disputed' ? "Reason for lifting dispute..." : "Reason for dispute (e.g., Ownership contestation, Court order)..."}
+                  value={disputeReason}
+                  onChange={(e) => setDisputeReason(e.target.value)}
+                  className="rounded-xl h-24 text-sm"
+                />
+             </div>
+          </div>
+          <DialogFooter className="gap-2">
+             <Button variant="ghost" onClick={() => setIsDisputeModalOpen(false)} className="rounded-xl h-11">Cancel</Button>
+             <Button 
+               onClick={handleToggleDispute}
+               className={cn("rounded-xl font-bold h-11 px-6", disputeTarget?.status === 'disputed' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700", "text-white")}
+             >
+                {disputeTarget?.status === 'disputed' ? 'Confirm Lift Dispute' : 'Confirm Dispute'}
              </Button>
           </DialogFooter>
         </DialogContent>

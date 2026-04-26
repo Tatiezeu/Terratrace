@@ -20,8 +20,10 @@ import { Input } from "../app/components/ui/input";
 import { Label } from "../app/components/ui/label";
 import { toast } from "sonner";
 import api from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function ProfilePage() {
+  const { updateUser } = useAuth();
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [profilePic, setProfilePic] = useState("https://api.dicebear.com/7.x/avataaars/svg?seed=John");
@@ -33,7 +35,7 @@ export default function ProfilePage() {
     phone: "",
     role: "",
     cniNumber: "",
-    accountStatus: "active"
+    status: "active"
   });
 
   const [passwords, setPasswords] = useState({
@@ -95,12 +97,13 @@ export default function ProfilePage() {
         const updatedUser = response.data.data;
         setUserData(updatedUser);
         if (updatedUser.profilePic) {
-          // Add timestamp to bust cache
+          // Force UI to use the new image path directly
           const baseUrl = updatedUser.profilePic.startsWith('http') ? updatedUser.profilePic : `http://localhost:5001${updatedUser.profilePic}`;
           setProfilePic(`${baseUrl}?t=${Date.now()}`);
         }
         setSelectedFile(null);
-        // Dispatch event to refresh navbar/context
+        // Direct context update and dispatch event for navbar sync
+        updateUser(updatedUser);
         window.dispatchEvent(new Event('auth-update'));
       }
     } catch (err) {
@@ -254,7 +257,7 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground">Your identity has been verified by the National Registry.</p>
               </div>
               <Badge className="bg-emerald-500 text-white border-none px-4 py-1.5 uppercase tracking-wider text-[10px] font-bold rounded-full">
-                {userData.accountStatus}
+                {userData.status}
               </Badge>
             </div>
 

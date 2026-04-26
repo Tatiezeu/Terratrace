@@ -27,8 +27,12 @@ export const AuthProvider = ({ children }) => {
         return () => window.removeEventListener('auth-update', fetchUser);
     }, []);
 
+    const updateUser = (userData) => {
+        setUser(prev => ({ ...prev, ...userData }));
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, setUser, refreshUser: fetchUser }}>
+        <AuthContext.Provider value={{ user, loading, setUser, refreshUser: fetchUser, updateUser }}>
             {children}
         </AuthContext.Provider>
     );

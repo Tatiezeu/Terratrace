@@ -21,6 +21,7 @@ import { Label } from "../app/components/ui/label";
 import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
 
 export default function ProfilePage() {
   const { updateUser } = useAuth();
@@ -48,6 +49,7 @@ export default function ProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -64,7 +66,7 @@ export default function ProfilePage() {
         console.error("Failed to fetch user:", err);
       }
     };
-    fetchUser();
+    fetchUser().finally(() => setPageLoading(false));
   }, []);
 
   const handleImageChange = (e) => {
@@ -139,6 +141,14 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <div className="h-full flex items-center justify-center p-12">
+        <SpinnerLoader className="scale-150" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-12 overflow-y-auto h-full pr-6 dark:bg-[#002147] dark:text-gray-100 p-6 transition-colors">

@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   ShieldCheck,
   FileText,
+  Trash2,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,16 +59,28 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
           </span>
         </div>
         {fileArray.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-1">
+          <div className="flex flex-col gap-2 mt-2 w-full">
             {fileArray.map((f, i) => (
-              <Badge key={i} variant="secondary" className="text-[10px] bg-white border border-emerald-200 text-emerald-700 truncate max-w-[150px] flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                {f.name}
-                <X className="w-2 h-2 cursor-pointer hover:text-red-500" onClick={(e) => {
-                  e.preventDefault();
-                  onChange(fileArray.filter((_, idx) => idx !== i));
-                }} />
-              </Badge>
+              <div 
+                key={i} 
+                className="flex items-center justify-between p-2 rounded-lg bg-white border border-emerald-100 hover:border-emerald-300 transition-colors group/file"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-emerald-900 font-medium truncate">{f.name}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChange(fileArray.filter((_, idx) => idx !== i));
+                  }}
+                  className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             ))}
           </div>
         )}

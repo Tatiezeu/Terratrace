@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { mockLandPlots, mockOfficers } from "../data/mockData";
 import api from "../utils/api";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
+import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
 import { Input } from "../app/components/ui/input";
@@ -276,17 +277,23 @@ export default function LandPlotsPage() {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPlots.map((plot) => (
-          <LandPlotCard
-            key={plot.id}
-            plot={plot}
-            onSeeMore={handleSeeMore}
-            onInitiateTransfer={handleInitiateTransfer}
-            onView360={handleView360}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="py-20">
+          <SpinnerLoader className="scale-150" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPlots.map((plot) => (
+            <LandPlotCard
+              key={plot.id}
+              plot={plot}
+              onSeeMore={handleSeeMore}
+              onInitiateTransfer={handleInitiateTransfer}
+              onView360={handleView360}
+            />
+          ))}
+        </div>
+      )}
 
       {filteredPlots.length === 0 && (
         <div className="text-center py-20 bg-card border-2 border-dashed border-border rounded-3xl">

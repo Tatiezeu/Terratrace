@@ -410,9 +410,26 @@ export default function NotificationsPage() {
                 >
                   <div className="relative">
                     <Avatar className="w-12 h-12 border-2 border-white shadow-sm shrink-0">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${(n.sender || n.recipient)?.lastName}`} />
+                      <AvatarImage src={(() => {
+                        const targetUser = activeTab === 'sent' ? n.recipient : n.sender;
+                        if (!targetUser) return "https://api.dicebear.com/7.x/avataaars/svg?seed=System";
+                        if (!targetUser.profilePic) return `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUser.firstName}`;
+                        
+                        if (targetUser.profilePic === 'default-profile.png') {
+                          return 'http://localhost:5001/assets/default-profile.png';
+                        }
+                        
+                        const isAbsolute = targetUser.profilePic.startsWith('http') || targetUser.profilePic.startsWith('data:');
+                        let avatarUrl = isAbsolute ? targetUser.profilePic : `http://localhost:5001/${targetUser.profilePic.startsWith('/') ? targetUser.profilePic.substring(1) : targetUser.profilePic}`;
+                        
+                        // Dynamically apply Cloudinary cropping transformations c_thumb, g_face, w_200, h_200
+                        if (avatarUrl.includes("cloudinary.com") && avatarUrl.includes("/image/upload/")) {
+                          avatarUrl = avatarUrl.replace("/image/upload/", "/image/upload/c_thumb,g_face,w_200,h_200/");
+                        }
+                        return avatarUrl;
+                      })()} />
                       <AvatarFallback className="bg-[var(--terra-navy)] text-white text-xs">
-                        {(n.sender || n.recipient)?.firstName?.[0]}{(n.sender || n.recipient)?.lastName?.[0]}
+                        {(activeTab === 'sent' ? n.recipient : n.sender)?.firstName?.[0] || "S"}{(activeTab === 'sent' ? n.recipient : n.sender)?.lastName?.[0] || "Y"}
                       </AvatarFallback>
                     </Avatar>
                   </div>

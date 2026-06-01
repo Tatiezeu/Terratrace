@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
 import { Mail, ArrowRight, ShieldCheck, RefreshCw } from "lucide-react";
 import api from "../utils/api";
-import Logo from "../app/components/shared/Logo";
+import logoSvg from "../assets/logo.svg";
 import { Button } from "../app/components/ui/button";
 import { Input } from "../app/components/ui/input";
 import { toast } from "sonner";
@@ -18,6 +18,9 @@ export default function EmailVerificationPage() {
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(0);
   const [resendCount, setResendCount] = useState(0);
+  const [isActivated, setIsActivated] = useState(false);
+  const [show2faWelcome, setShow2faWelcome] = useState(false);
+  const [welcomeUserName, setWelcomeUserName] = useState("");
   const inputsRef = useRef([]);
 
   useEffect(() => {
@@ -29,6 +32,57 @@ export default function EmailVerificationPage() {
     }
     return () => clearInterval(interval);
   }, [timer]);
+
+  useEffect(() => {
+    const emailParam = queryParams.get("email");
+    const codeParam = queryParams.get("code");
+
+    if (emailParam && codeParam) {
+      localStorage.setItem('temp_email', emailParam);
+      
+      const codeDigits = codeParam.split("").slice(0, 6);
+      while (codeDigits.length < 6) codeDigits.push("");
+      setCode(codeDigits);
+
+      const triggerAutoVerification = async () => {
+        setLoading(true);
+        try {
+          const response = await api.post('/auth/verify-email', {
+            email: emailParam,
+            code: codeParam
+          });
+
+          if (response.data.success) {
+            localStorage.removeItem('temp_email');
+
+            if (reason === "2fa") {
+              const userData = response.data.data?.user || response.data.data;
+              localStorage.setItem('token', response.data.token);
+              localStorage.setItem('user', JSON.stringify(userData));
+              setWelcomeUserName(userData?.firstName || "Officer");
+              setShow2faWelcome(true);
+              setTimeout(() => {
+                window.location.href = "/dashboard";
+              }, 2500);
+            } else {
+              setIsActivated(true);
+              toast.success("Account Activated Successfully", {
+                description: "Your landowner profile is now active and ready for access."
+              });
+            }
+          }
+        } catch (err) {
+          toast.error("Auto-activation failed", {
+            description: err.response?.data?.message || "Invalid or expired link. Please verify manually."
+          });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      triggerAutoVerification();
+    }
+  }, [location.search]);
 
   const handleChange = (index, value) => {
     if (value.length > 1) value = value[value.length - 1];
@@ -68,16 +122,23 @@ export default function EmailVerificationPage() {
       });
 
       if (response.data.success) {
-        // Store token and user data
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.data.user));
         localStorage.removeItem('temp_email');
 
-        toast.success("Verification Successful", {
-          description: "Access granted to the TerraTrace Portal.",
-        });
-        
-        window.location.href = "/dashboard";
+        if (reason === "2fa") {
+          const userData = response.data.data?.user || response.data.data;
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(userData));
+          setWelcomeUserName(userData?.firstName || "Officer");
+          setShow2faWelcome(true);
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 2500);
+        } else {
+          setIsActivated(true);
+          toast.success("Account Activated Successfully", {
+            description: "Your landowner profile is now active and ready for access."
+          });
+        }
       }
     } catch (err) {
       toast.error("Verification failed", {
@@ -116,6 +177,127 @@ export default function EmailVerificationPage() {
     }
   };
 
+  // 2FA success welcome overlay — shown briefly before redirecting to dashboard
+  if (show2faWelcome) {
+    return (
+      <div className="min-h-screen bg-[#001529] flex flex-col items-center justify-center p-6 font-['Montserrat']">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="max-w-md w-full text-center"
+        >
+          {/* Animated shield */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
+            className="w-28 h-28 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-emerald-500/40"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <ShieldCheck className="w-14 h-14 text-white" />
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <p className="text-emerald-400 text-xs font-black uppercase tracking-[0.3em] mb-3">
+              Access Granted
+            </p>
+            <h1 className="text-4xl font-bold font-['Syne'] text-white mb-2">
+              Welcome back,
+            </h1>
+            <h2 className="text-5xl font-black font-['Syne'] text-[#D4AF37] mb-6">
+              {welcomeUserName}!
+            </h2>
+            <p className="text-white/50 text-sm font-medium leading-relaxed">
+              Identity verified. Redirecting you to the<br />
+              <span className="text-white/80 font-bold">TerraTrace Secure Portal...</span>
+            </p>
+          </motion.div>
+
+          {/* Progress bar */}
+          <motion.div
+            className="mt-10 h-1 bg-white/10 rounded-full overflow-hidden max-w-xs mx-auto"
+          >
+            <motion.div
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 2.2, ease: "linear" }}
+              className="h-full bg-emerald-400 rounded-full"
+            />
+          </motion.div>
+          <p className="text-white/30 text-[10px] font-medium mt-3 uppercase tracking-widest">
+            Initializing secure session...
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+
+  if (isActivated) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 font-['Montserrat']">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden"
+        >
+          <div className="bg-[#002147] p-10 text-white text-center relative">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <ShieldCheck className="w-24 h-24" />
+            </div>
+            
+            <div className="flex justify-center mb-6 select-none">
+              <div className="bg-white/95 dark:bg-white/10 backdrop-blur-md px-5 py-2 rounded-2xl shadow-lg border border-white/20 w-fit mx-auto flex items-center justify-center">
+                <img src={logoSvg} alt="TerraTrace Logo" className="h-8 w-auto" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold font-['Syne'] tracking-tight">
+              Activation Successful!
+            </h2>
+            <p className="text-white/70 text-sm mt-2 font-medium">
+              Your landowner account is now fully active
+            </p>
+          </div>
+
+          <div className="p-10 text-center space-y-6">
+            <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <ShieldCheck className="w-10 h-10 text-emerald-600" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold text-[#002147] font-['Syne']">Ready for Access</h3>
+              <p className="text-sm text-gray-500 leading-relaxed font-medium">
+                Your credentials have been successfully authenticated against the MINDCAF secure protocol. You are now cleared to access the TerraTrace digital land portal.
+              </p>
+            </div>
+
+            <Button 
+              onClick={() => navigate("/login")}
+              className="w-full h-14 bg-[var(--terra-emerald)] hover:bg-[#208a54] text-white rounded-2xl font-bold text-lg shadow-xl shadow-emerald-500/10 transition-all flex items-center justify-center gap-3 group"
+            >
+              <span>Proceed to Login</span>
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
+        </motion.div>
+        
+        <p className="mt-8 text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+          <ShieldCheck className="w-3 h-3" />
+          Secured by TerraTrace Protocol
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 font-['Montserrat']">
       <motion.div 
@@ -129,8 +311,10 @@ export default function EmailVerificationPage() {
             <ShieldCheck className="w-24 h-24" />
           </div>
           
-          <div className="flex justify-center mb-6">
-            <Logo variant="dark" className="h-10" />
+          <div className="flex justify-center mb-6 select-none">
+            <div className="bg-white/95 dark:bg-white/10 backdrop-blur-md px-5 py-2 rounded-2xl shadow-lg border border-white/20 w-fit mx-auto flex items-center justify-center">
+              <img src={logoSvg} alt="TerraTrace Logo" className="h-8 w-auto" />
+            </div>
           </div>
           <h2 className="text-2xl font-bold font-['Syne'] tracking-tight">
             {reason === "2fa" ? "Two-Factor Verification" : "Verify Your Email"}
@@ -154,7 +338,7 @@ export default function EmailVerificationPage() {
                   value={digit}
                   onChange={(e) => handleChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
-                  className="w-12 h-14 text-center text-xl font-black bg-gray-50 border-gray-100 rounded-xl focus:ring-emerald-500 focus:bg-white transition-all p-0"
+                  className="w-12 h-14 text-center text-2xl font-extrabold tracking-widest bg-gray-50 border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:border-emerald-400 transition-all p-0 shadow-sm"
                   autoFocus={idx === 0}
                 />
               ))}

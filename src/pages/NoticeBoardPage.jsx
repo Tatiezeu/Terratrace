@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   MapPin, Calendar, Clock, Search, Filter, AlertCircle,
-  ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send, Eye, Timer
+  ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send, Eye, Timer, Trash2
 } from "lucide-react";
 import { Card, CardContent } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -41,6 +41,21 @@ export default function NoticeBoardPage() {
       toast.error("Failed to fetch public notices");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleClearAllNotices = async () => {
+    if (!window.confirm("Are you absolutely sure you want to permanently clear ALL public notices from the database? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      const res = await api.delete('/transfer/public-notices');
+      if (res.data.success) {
+        toast.success(res.data.message || "All public notices cleared successfully!");
+        setNotices([]);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to clear public notices");
     }
   };
 
@@ -92,13 +107,25 @@ export default function NoticeBoardPage() {
     <div className="space-y-8 pb-12">
       {/* Header */}
       <div className="border-b border-border pb-6">
-        <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] flex items-center gap-3">
-          <Megaphone className="w-8 h-8 text-[var(--terra-emerald)]" />
-          Public Notice Board
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Official land transfer, succession, and dispute notices across Cameroon's 10 regions.
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-white flex items-center gap-3">
+              <Megaphone className="w-8 h-8 text-[var(--terra-emerald)]" />
+              Public Notice Board
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Official land transfer, succession, and dispute notices across Cameroon's 10 regions.
+            </p>
+          </div>
+          {user?.role === 'SuperAdmin' && (
+            <Button
+              onClick={handleClearAllNotices}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl h-11 px-6 shadow-lg shadow-red-500/10 gap-2 shrink-0 md:self-end"
+            >
+              <Trash2 className="w-4 h-4" /> Clear All Notices
+            </Button>
+          )}
+        </div>
         <div className="flex gap-4 mt-4">
           <div className="flex items-center gap-2 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span><strong>{notices.length}</strong> Active Notices</span></div>
         </div>
@@ -149,8 +176,8 @@ export default function NoticeBoardPage() {
                     <Badge className={cn(
                       "border text-[10px] uppercase font-bold",
                       new Date(notice.publicNotice.endDate) < new Date() 
-                        ? "bg-red-100 text-red-700 border-red-200" 
-                        : "bg-emerald-100 text-emerald-700 border-emerald-200"
+                        ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800" 
+                        : "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800"
                     )}>
                       {new Date(notice.publicNotice.endDate) < new Date() ? "EXPIRED NOTICE" : "ACTIVE NOTICE"}
                     </Badge>
@@ -181,18 +208,18 @@ export default function NoticeBoardPage() {
                       "The land in question is about to be transferred from {notice.sender.firstName} {notice.sender.lastName} to {notice.receiver?.firstName} {notice.receiver?.lastName}."
                     </p>
 
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2 dark:bg-amber-950/30 dark:border-amber-800">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <p className="text-[10px] text-amber-700 leading-snug">
-                        <strong className="text-amber-800">LRO in charge:</strong> {notice.lro?.firstName} {notice.lro?.lastName}. File any objection before the expiry date.
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
+                        <strong className="text-amber-800 dark:text-amber-300">LRO in charge:</strong> {notice.lro?.firstName} {notice.lro?.lastName}. File any objection before the expiry date.
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-5 mt-auto flex items-center justify-between border-t gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <span className="text-[10px] font-bold text-muted-foreground uppercase">Certified Notice</span>
                     </div>
@@ -247,8 +274,8 @@ export default function NoticeBoardPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 space-y-1">
-              <p className="font-bold text-red-800">⚠ Legal Notice</p>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 space-y-1 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400">
+              <p className="font-bold text-red-800 dark:text-red-300">⚠ Legal Notice</p>
               <p>Filing a false objection is an offense under Cameroon Land Law. Ensure your claim is legitimate before submitting.</p>
             </div>
             <div className="space-y-1.5">
@@ -352,12 +379,12 @@ function CountdownDisplay({ targetDate }) {
           <Timer className={`w-6 h-6 mb-1 ${isExpired ? 'text-red-500' : 'text-[var(--terra-emerald)]'}`} />
           {timeLeft.days > 0 ? (
             <>
-              <span className="text-4xl font-black text-[#002147]">{timeLeft.days}</span>
+              <span className="text-4xl font-black text-[#002147] dark:text-white">{timeLeft.days}</span>
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Days Left</span>
             </>
           ) : (
             <>
-              <span className="text-3xl font-black text-[#002147]">{String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}</span>
+              <span className="text-3xl font-black text-[#002147] dark:text-white">{String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}</span>
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Hrs : Min : Sec</span>
             </>
           )}

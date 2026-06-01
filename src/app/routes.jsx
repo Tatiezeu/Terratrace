@@ -15,6 +15,8 @@ import ErrorPage from "../pages/ErrorPage";
 import LoginPage from "../pages/LoginPage";
 import RegistrationPage from "../pages/RegistrationPage";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
+import ActivateAccountPage from "../pages/ActivateAccountPage";
+import ApplicationTracking from "../pages/ApplicationTracking";
 
 export const router = createBrowserRouter([
   {
@@ -38,6 +40,11 @@ export const router = createBrowserRouter([
     errorElement: <ErrorPage />,
   },
   {
+    path: "/activate",
+    Component: ActivateAccountPage,
+    errorElement: <ErrorPage />,
+  },
+  {
     path: "/dashboard",
     Component: AppLayout,
     errorElement: <ErrorPage />,
@@ -52,6 +59,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: ProfilePage },
       { path: "notifications", Component: NotificationsPage },
       { path: "settings", Component: SettingsPage },
+      { path: "applications", Component: ApplicationTracking },
     ],
   },
 ]);

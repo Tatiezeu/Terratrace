@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -19,6 +19,7 @@ import { Input } from "../app/components/ui/input";
 import { Label } from "../app/components/ui/label";
 import { toast } from "sonner";
 import api from "../utils/api";
+import { executeRecaptcha, loadRecaptchaScript, isRecaptchaConfigured } from "../utils/recaptchaLoader";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -28,22 +29,43 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [welcomeName, setWelcomeName] = useState("");
+  const [isCaptchaRequired, setIsCaptchaRequired] = useState(() => {
+    return localStorage.getItem('recaptcha_enabled') !== 'false';
+  });
+
+  // Pre-load Google reCAPTCHA v3 script immediately when page mounts
+  // Only if a real site key is configured (not test keys)
+  useEffect(() => {
+    if (isCaptchaRequired && isRecaptchaConfigured()) {
+      loadRecaptchaScript(import.meta.env.VITE_RECAPTCHA_SITE_KEY);
+    }
+  }, [isCaptchaRequired]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     
+    let token = null;
+    if (isCaptchaRequired) {
+      try {
+        token = await executeRecaptcha('login');
+      } catch (err) {
+        console.warn("reCAPTCHA programmatic execution failed, executing fail-safe pass.", err);
+      }
+    }
+    
     try {
       const response = await api.post('/auth/login', {
         email,
-        password
+        password,
+        recaptchaToken: token
       });
 
       if (response.data.success) {
         if (response.data.twoFactorRequired) {
           localStorage.setItem('temp_email', email);
           toast.info("Two-Factor Authentication", {
-            description: "A verification code has been sent to your email.",
+            description: response.data.message || "A verification code has been sent to your email.",
           });
           navigate("/verify-email?reason=2fa");
           return;
@@ -251,6 +273,33 @@ export default function LoginPage() {
                 <input type="checkbox" id="remember" className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer" />
                 <label htmlFor="remember" className="text-sm text-gray-600 font-medium cursor-pointer">Remember this device</label>
               </div>
+
+              {/* reCAPTCHA v3 shield badge — visible when active */}
+              {isCaptchaRequired && isRecaptchaConfigured() && (
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30">
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-emerald-800 leading-none">Protected by reCAPTCHA v3</p>
+                    <p className="text-[10px] text-emerald-700/70 mt-0.5 leading-snug">
+                      Behavioral risk scoring active ·{" "}
+                      <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline hover:text-emerald-900">Privacy</a>
+                      {" & "}
+                      <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="underline hover:text-emerald-900">Terms</a>
+                    </p>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                </div>
+              )}
+              {isCaptchaRequired && !isRecaptchaConfigured() && (
+                <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                  </div>
+                  <p className="text-[11px] text-amber-800 font-medium">reCAPTCHA enabled but site key not configured</p>
+                </div>
+              )}
 
               <Button 
                 type="submit" 

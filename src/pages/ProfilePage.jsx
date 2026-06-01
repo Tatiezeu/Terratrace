@@ -22,11 +22,11 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
+import { useProfile, useUpdateProfile } from "../hooks/useProfile";
 
 export default function ProfilePage() {
   const { updateUser } = useAuth();
   const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
   const [profilePic, setProfilePic] = useState("https://api.dicebear.com/7.x/avataaars/svg?seed=John");
 
   const [userData, setUserData] = useState({
@@ -48,72 +48,83 @@ export default function ProfilePage() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
+  const { data: serverUser, isLoading: pageLoading, error: fetchError } = useProfile();
+  const { mutateAsync: updateProfile, isPending: loading, error: mutationError } = useUpdateProfile();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await api.get('/users/me');
-        if (response.data.success) {
-          const user = response.data.data;
-          setUserData(user);
-          if (user.profilePic) {
-            setProfilePic(user.profilePic.startsWith('http') ? user.profilePic : `http://localhost:5001${user.profilePic}`);
+    if (serverUser) {
+      setUserData(serverUser);
+      if (serverUser.profilePic) {
+        if (serverUser.profilePic === 'default-profile.png') {
+          setProfilePic('http://localhost:5001/assets/default-profile.png');
+        } else {
+          const isAbsolute = serverUser.profilePic.startsWith('http') || serverUser.profilePic.startsWith('data:');
+          let avatarUrl = isAbsolute ? serverUser.profilePic : `http://localhost:5001/${serverUser.profilePic.startsWith('/') ? serverUser.profilePic.substring(1) : serverUser.profilePic}`;
+          
+          // Dynamically apply Cloudinary cropping transformations c_thumb, g_face, w_200, h_200
+          if (avatarUrl.includes("cloudinary.com") && avatarUrl.includes("/image/upload/")) {
+            avatarUrl = avatarUrl.replace("/image/upload/", "/image/upload/c_thumb,g_face,w_200,h_200/");
           }
+          setProfilePic(avatarUrl);
         }
-      } catch (err) {
-        console.error("Failed to fetch user:", err);
       }
-    };
-    fetchUser().finally(() => setPageLoading(false));
-  }, []);
+    }
+  }, [serverUser]);
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
+      // 1. Preview instantly
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfilePic(reader.result);
       };
       reader.readAsDataURL(file);
+
+      // 2. Upload and save to database instantly
+      const toastId = toast.loading("Saving and uploading new profile image...");
+      try {
+        const result = await updateProfile({
+          userData: {
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            phone: userData.phone,
+            profilePic: serverUser?.profilePic
+          },
+          selectedFile: file
+        });
+
+        if (result) {
+          toast.success("Profile picture updated and saved successfully!", { id: toastId });
+          // Dispatch custom event to notify AppLayout / TopNav to fetch user data immediately
+          window.dispatchEvent(new CustomEvent('auth-update'));
+        }
+      } catch (err) {
+        console.error("Instant profile pic save failed:", err);
+        toast.error(`Failed to save profile picture: ${err.message}`, { id: toastId });
+      }
     }
   };
 
   const handleSave = async () => {
-    setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('firstName', userData.firstName);
-      formData.append('lastName', userData.lastName);
-      formData.append('phone', userData.phone);
-      if (selectedFile) {
-        formData.append('profilePic', selectedFile);
-      }
+      const result = await updateProfile({
+        userData: {
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          phone: userData.phone,
+          profilePic: serverUser?.profilePic
+        },
+        selectedFile: null
+      });
 
-      const response = await api.patch("/users/update-me", formData);
-
-      if (response.data.success) {
-        toast.success("Profile updated successfully!");
-        const updatedUser = response.data.data;
-        setUserData(updatedUser);
-        if (updatedUser.profilePic) {
-          // Force UI to use the new image path directly
-          const baseUrl = updatedUser.profilePic.startsWith('http') ? updatedUser.profilePic : `http://localhost:5001${updatedUser.profilePic}`;
-          setProfilePic(`${baseUrl}?t=${Date.now()}`);
-        }
-        setSelectedFile(null);
-        // Direct context update and dispatch event for navbar sync
-        updateUser(updatedUser);
-        window.dispatchEvent(new Event('auth-update'));
+      if (result) {
+        toast.success("Profile information updated successfully!");
+        // Dispatch custom event to sync navbar/sidebar immediately
+        window.dispatchEvent(new CustomEvent('auth-update'));
       }
     } catch (err) {
-      toast.error("Failed to update profile", {
-        description: err.response?.data?.message || "Something went wrong."
-      });
-    } finally {
-      setLoading(false);
+      console.error("Profile update failed:", err);
     }
   };
 
@@ -157,7 +168,7 @@ export default function ProfilePage() {
         <p className="text-muted-foreground mt-1 dark:text-gray-400 italic">Manage your personal information and account security.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 max-w-4xl">
+      <div className="grid grid-cols-1 gap-8 w-[70vw] max-w-none">
         {/* Personal Info Card */}
         <Card className="border-none shadow-sm bg-white/50 dark:bg-white/5 backdrop-blur-sm">
           <CardHeader>
@@ -167,6 +178,11 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-8">
+            {mutationError && (
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl p-4 text-xs font-semibold flex items-center gap-2">
+                <span>⚠ Error saving changes: {mutationError.message || "Please check connection and try again."}</span>
+              </div>
+            )}
             <div className="flex items-center gap-6">
               <div className="relative group">
                 <Avatar className="w-24 h-24 ring-4 ring-[var(--terra-emerald)]/20 transition-all group-hover:ring-[var(--terra-emerald)]/40">
@@ -231,7 +247,7 @@ export default function ProfilePage() {
 
             <div className="pt-4 flex justify-end">
               <Button onClick={handleSave} disabled={loading} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 px-8 text-white h-11 rounded-xl shadow-lg shadow-emerald-500/10">
-                {loading ? "Saving..." : "Save Changes"}
+                {loading ? "Saving & Uploading..." : "Save Changes"}
               </Button>
             </div>
           </CardContent>

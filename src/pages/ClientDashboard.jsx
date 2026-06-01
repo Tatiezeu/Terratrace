@@ -150,95 +150,7 @@ export default function ClientDashboard() {
         </div>
       </section>
 
-      {/* Ongoing Transfers Tracker */}
-      {ongoingTransfers.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold font-['Syne'] flex items-center gap-2"><Timer className="w-5 h-5 text-[var(--terra-emerald)]" /> Real-time Application Tracking</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {ongoingTransfers
-              .filter(t => t.sender?._id === user?._id)
-              .map(transfer => {
-                const activeStep = getActiveStep(transfer.status);
-              return (
-                <Card key={transfer._id} className="border-none shadow-sm bg-white overflow-hidden rounded-2xl group transition-all hover:shadow-md">
-                  <CardHeader className="bg-muted/30 py-3 px-6 border-b">
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="font-mono text-sm font-bold text-[#002147]">{transfer.plot?.landCode}</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Dossier ID: {transfer._id.substring(0, 8)}</span>
-                           <Badge variant="outline" className="text-[8px] border-blue-200 text-blue-600 bg-blue-50/50 py-0 h-4">
-                              {transfer.isSubdivision ? "SUB PORTION" : "FULL PORTION"}
-                           </Badge>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-[9px] uppercase border-emerald-200 text-emerald-700 bg-emerald-50 h-6 px-2">
-                        {transfer.status.replace(/_/g, ' ')}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-6 space-y-6">
-                     <div className="space-y-4">
-                        <div className="flex justify-between items-center text-xs">
-                           <span className="text-muted-foreground font-medium">Overall Progress</span>
-                           <span className="font-bold text-[var(--terra-emerald)]">{getProgressPercentage(transfer.status)}%</span>
-                        </div>
-                        <div className="w-full bg-muted h-3 rounded-full overflow-hidden border p-0.5">
-                           <motion.div 
-                             initial={{ width: 0 }}
-                             animate={{ width: `${getProgressPercentage(transfer.status)}%` }}
-                             className="h-full bg-gradient-to-r from-[var(--terra-navy)] to-[var(--terra-emerald)] rounded-full shadow-sm"
-                           />
-                        </div>
-                     </div>
 
-                     <div className="flex justify-between relative px-2">
-                        {STEPS.map((step, i) => (
-                           <div key={i} className="flex flex-col items-center gap-2 z-10">
-                              <div className={cn(
-                                 "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all duration-500",
-                                 i <= activeStep ? "bg-[var(--terra-emerald)] text-white shadow-lg shadow-emerald-500/20" : "bg-muted text-muted-foreground border border-dashed"
-                              )}>
-                                 {i < activeStep ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
-                              </div>
-                              <span className={cn(
-                                 "text-[9px] font-bold uppercase tracking-tighter text-center",
-                                 i <= activeStep ? "text-[#002147]" : "text-muted-foreground"
-                              )}>{step.name}</span>
-                           </div>
-                        ))}
-                        {/* Connecting Line */}
-                        <div className="absolute top-3 left-6 right-6 h-[1px] bg-muted -z-0" />
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${(activeStep / (STEPS.length - 1)) * 100}%` }}
-                          className="absolute top-3 left-6 h-[2px] bg-emerald-500/30 -z-0"
-                        />
-                     </div>
-
-                     <div className="flex items-center justify-between pt-4 border-t text-[10px] text-muted-foreground bg-muted/20 -mx-6 -mb-6 px-6 py-3">
-                        <div className="flex items-center gap-2">
-                           <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                              {transfer.transferType === 'direct_grant' ? 'G' : 'N'}
-                           </div>
-                           <span>
-                              {transfer.transferType === 'direct_grant' 
-                                ? "Direct Registry Application" 
-                                : `${transfer.notary?.firstName || "Assigning"} ${transfer.notary?.lastName || "Notary..."}`}
-                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-white/50 px-2 py-1 rounded-full border">
-                           <Clock className="w-3 h-3 text-amber-500" />
-                           <span className="font-medium">Last Update: {new Date(transfer.updatedAt).toLocaleDateString()}</span>
-                        </div>
-                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 space-y-6">
@@ -249,7 +161,7 @@ export default function ClientDashboard() {
             </div>
             <div className="flex gap-2">
                <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={cn("h-11 rounded-xl gap-2", showFilters && "border-[var(--terra-emerald)]")}><Filter className="w-4 h-4" /> Filters</Button>
-               <div className="flex border rounded-xl overflow-hidden h-11 bg-white">
+               <div className="flex border rounded-xl overflow-hidden h-11 bg-white dark:bg-slate-800 dark:border-white/10">
                   <button onClick={() => setView("grid")} className={cn("px-4 transition-all flex items-center justify-center", view === "grid" ? "bg-[var(--terra-navy)] text-white" : "hover:bg-muted text-muted-foreground")}><LayoutList className="w-4 h-4" /></button>
                   <button onClick={() => setView("list")} className={cn("px-4 transition-all flex items-center justify-center border-l", view === "list" ? "bg-[var(--terra-navy)] text-white" : "hover:bg-muted text-muted-foreground")}><RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} /></button>
                </div>
@@ -275,7 +187,7 @@ export default function ClientDashboard() {
               ))}
             </div>
           ) : (
-            <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white">
+            <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-slate-800/60 dark:border dark:border-white/10">
               <div className="divide-y divide-border">
                 {filteredPlots.map(plot => (
                   <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-all cursor-pointer" onClick={() => setSelectedPlot(plot)}>
@@ -298,7 +210,7 @@ export default function ClientDashboard() {
 
         <div className="space-y-6">
           <LandCodeInfo />
-          <Card className="border-purple-200 bg-purple-50/40 rounded-2xl overflow-hidden">
+          <Card className="border-purple-200 bg-purple-50/40 rounded-2xl overflow-hidden dark:border-purple-900/40 dark:bg-purple-950/20">
             <CardHeader className="pb-3">
                <CardTitle className="text-base flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-purple-600" /> Region Codes
@@ -307,18 +219,18 @@ export default function ClientDashboard() {
             <CardContent className="p-0">
                <div className="divide-y divide-border/50">
                   {REGION_CODES.slice(0, isRegionsExpanded ? 10 : 5).map(r => (
-                    <div key={r.code} className="flex justify-between p-3 px-4 hover:bg-white transition-colors">
+                    <div key={r.code} className="flex justify-between p-3 px-4 hover:bg-white dark:hover:bg-white/5 transition-colors">
                        <div className="flex flex-col">
                           <span className="text-sm font-semibold">{r.name}</span>
                           <span className="text-[10px] text-muted-foreground">{r.capital}</span>
                        </div>
-                       <Badge className="bg-purple-100 text-purple-700 h-6">{r.code}</Badge>
+                       <Badge className="bg-purple-100 text-purple-700 h-6 dark:bg-purple-900/30 dark:text-purple-400">{r.code}</Badge>
                     </div>
                   ))}
                </div>
                <button 
                  onClick={() => setIsRegionsExpanded(!isRegionsExpanded)}
-                 className="w-full py-3 text-[11px] font-bold uppercase tracking-widest text-purple-600 hover:bg-purple-100/50 transition-colors flex items-center justify-center gap-2 border-t border-purple-100"
+                 className="w-full py-3 text-[11px] font-bold uppercase tracking-widest text-purple-600 hover:bg-purple-100/50 transition-colors flex items-center justify-center gap-2 border-t border-purple-100 dark:text-purple-400 dark:hover:bg-purple-900/20 dark:border-purple-900/40"
                >
                  {isRegionsExpanded ? "Show Less" : "View All Regions"}
                  <ArrowRight className={cn("w-3 h-3 transition-transform", isRegionsExpanded ? "-rotate-90" : "rotate-90")} />

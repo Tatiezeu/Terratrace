@@ -156,8 +156,8 @@ export default function LRODashboard() {
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147]">Registry Officer Dashboard</h1>
-          <p className="text-muted-foreground mt-1 text-base">Regional Land Registry &amp; Final Authorizations</p>
+          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-white">Registry Officer Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-base dark:text-gray-400">Regional Land Registry &amp; Final Authorizations</p>
         </div>
         <div className="flex gap-3">
           <Button onClick={() => setIsRegisterOpen(true)} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 border-0 gap-2 h-11 px-6 rounded-xl shadow-lg shadow-emerald-500/20 text-white">
@@ -167,8 +167,8 @@ export default function LRODashboard() {
       </div>
 
       {/* Forwarded Applications Section */}
-      <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white">
-        <CardHeader className="bg-muted/30 py-4">
+      <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10">
+        <CardHeader className="bg-muted/30 dark:bg-slate-800/50 py-4">
           <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2">
             <FileCheck className="w-5 h-5 text-blue-600" /> Forwarded Transfer Applications
           </CardTitle>
@@ -177,21 +177,21 @@ export default function LRODashboard() {
         <CardContent className="p-0">
           <div className="divide-y divide-border">
             {transfers.map(req => (
-              <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 transition-all group">
+              <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 dark:hover:bg-white/5 transition-all group">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <ShieldCheck className="w-6 h-6 text-blue-600" />
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="font-bold text-[#002147]">{req.plot?.landCode}</h4>
+                      <h4 className="font-bold text-[#002147] dark:text-white">{req.plot?.landCode}</h4>
                       <Badge className={cn(
                         "border-none text-[9px] uppercase font-black px-2 py-0.5",
                         req.status === 'Completed' 
-                          ? "bg-emerald-100 text-emerald-700" 
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" 
                           : req.transferType === 'direct_grant'
-                            ? "bg-purple-600 text-white shadow-sm"
-                            : (req.plot?.status === 'disputed' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700")
+                            ? "bg-purple-600 text-white shadow-sm dark:bg-purple-700"
+                            : (req.plot?.status === 'disputed' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400")
                       )}>
                         {req.status === 'Completed' 
                           ? "Authorized & Completed" 
@@ -199,7 +199,7 @@ export default function LRODashboard() {
                             ? "DIRECT GRANT"
                             : (req.plot?.status === 'disputed' ? "BLOCKED (DISPUTED)" : "Review Pending")}
                       </Badge>
-                      <Badge variant="outline" className="text-[8px] border-blue-200 text-blue-600 bg-blue-50/50">
+                      <Badge variant="outline" className="text-[8px] border-blue-200 dark:border-blue-800/40 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20">
                          {req.isSubdivision ? `SUB PORTION (${req.transferArea}m²)` : "FULL PORTION"}
                       </Badge>
                     </div>
@@ -217,14 +217,14 @@ export default function LRODashboard() {
                     <Button 
                       onClick={() => { setSelectedRequest(req); setIsApprovalOpen(true); }} 
                       variant="outline"
-                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-lg h-9 px-4 font-bold flex items-center gap-2"
+                      className="border-emerald-200 dark:border-emerald-800/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 rounded-lg h-9 px-4 font-bold flex items-center gap-2"
                     >
                       <Eye className="w-4 h-4" /> View Summary
                     </Button>
                   ) : (
                     <Button 
                       onClick={() => { setSelectedRequest(req); setIsApprovalOpen(true); }} 
-                      className="bg-[#002147] hover:bg-blue-900 text-white rounded-lg h-9 px-4 font-bold flex items-center gap-2"
+                      className="bg-[#002147] hover:bg-blue-900 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold flex items-center gap-2"
                     >
                       <Eye className="w-4 h-4" /> Review Dossier
                     </Button>
@@ -238,8 +238,8 @@ export default function LRODashboard() {
       </Card>
 
       {/* Regional Registry Table */}
-      <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white">
-        <CardHeader className="flex flex-row items-center justify-between py-4 border-b">
+      <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10">
+        <CardHeader className="flex flex-row items-center justify-between py-4 border-b dark:border-white/10 dark:bg-slate-800/50">
           <CardTitle className="text-lg font-bold font-['Syne']">Regional Registry</CardTitle>
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -249,7 +249,7 @@ export default function LRODashboard() {
         <CardContent className="p-0">
           <div className="divide-y divide-border">
             {filteredPlots.map((plot) => (
-              <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-all group">
+              <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 dark:hover:bg-white/5 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0">
                     <img src={plot.coverImage ? `http://localhost:5001${plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover" />
@@ -260,7 +260,7 @@ export default function LRODashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                   <Badge className={`${statusConfig[plot.status]?.color || statusConfig.cleared.color} border text-[10px] uppercase px-2 py-0.5`}>
+                   <Badge className={`${statusConfig[plot.status]?.color || statusConfig.cleared.color} dark:bg-opacity-30 dark:border-opacity-30 border text-[10px] uppercase px-2 py-0.5`}>
                       {statusConfig[plot.status]?.label || plot.status}
                    </Badge>
                    <Button 
@@ -268,7 +268,7 @@ export default function LRODashboard() {
                      size="sm" 
                      disabled={!['under_review', 'under_transfer', 'disputed'].includes(plot.status)}
                      onClick={() => { setDisputeTarget({ id: plot._id, status: plot.status, code: plot.landCode }); setIsDisputeModalOpen(true); }}
-                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 text-amber-700", plot.status === 'disputed' && "bg-amber-600 text-white border-none", !['under_review', 'under_transfer', 'disputed'].includes(plot.status) && "opacity-30 cursor-not-allowed")}
+                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20", plot.status === 'disputed' && "bg-amber-600 text-white border-none", !['under_review', 'under_transfer', 'disputed'].includes(plot.status) && "opacity-30 cursor-not-allowed")}
                    >
                      <AlertTriangle className="w-3.5 h-3.5" />
                      {plot.status === 'disputed' ? 'Lift Dispute' : 'Dispute Land'}
@@ -314,23 +314,23 @@ export default function LRODashboard() {
           <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6">
              {/* Summary Cards */}
              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-muted/50 p-4 rounded-xl border border-border/50">
+                <div className="bg-muted/50 dark:bg-slate-800/60 p-4 rounded-xl border border-border/50 dark:border-white/10">
                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Initiator / Seller</p>
                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs">{selectedRequest?.sender?.firstName?.[0] || "?"}</div>
+                      <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center text-blue-700 dark:text-blue-400 font-bold text-xs">{selectedRequest?.sender?.firstName?.[0] || "?"}</div>
                       <div>
-                         <p className="text-sm font-bold">{selectedRequest?.sender?.firstName || "Unknown"} {selectedRequest?.sender?.lastName || ""}</p>
-                         <p className="text-[10px] text-muted-foreground">{selectedRequest?.sender?.email || "No email provided"}</p>
+                         <p className="text-sm font-bold text-[#002147] dark:text-white">{selectedRequest?.sender?.firstName || "Unknown"} {selectedRequest?.sender?.lastName || ""}</p>
+                         <p className="text-[10px] text-muted-foreground dark:text-gray-400">{selectedRequest?.sender?.email || "No email provided"}</p>
                       </div>
                    </div>
                 </div>
-                <div className="bg-muted/50 p-4 rounded-xl border border-border/50">
+                <div className="bg-muted/50 dark:bg-slate-800/60 p-4 rounded-xl border border-border/50 dark:border-white/10">
                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Target Property</p>
                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700"><MapPin className="w-4 h-4" /></div>
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400"><MapPin className="w-4 h-4" /></div>
                       <div>
-                         <p className="text-sm font-bold font-mono">{selectedRequest?.plot?.landCode || "N/A"}</p>
-                         <p className="text-[10px] text-muted-foreground">{selectedRequest?.plot?.location || "Location pending"}</p>
+                         <p className="text-sm font-bold font-mono text-[#002147] dark:text-white">{selectedRequest?.plot?.landCode || "N/A"}</p>
+                         <p className="text-[10px] text-muted-foreground dark:text-gray-400">{selectedRequest?.plot?.location || "Location pending"}</p>
                       </div>
                    </div>
                 </div>
@@ -342,14 +342,14 @@ export default function LRODashboard() {
                 <div>
                    <p className="text-[10px] font-bold text-muted-foreground uppercase px-1 mb-2">Identity &amp; Supporting Docs</p>                    <div className="grid grid-cols-1 gap-2">
                       {selectedRequest?.clientDocuments?.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-white shadow-sm hover:border-blue-200 transition-colors">
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-white/5 dark:border-white/10 shadow-sm hover:border-blue-200 dark:hover:border-blue-800/40 transition-colors">
                            <div className="flex items-center gap-3">
                               <FileCheck className="w-4 h-4 text-blue-500" />
-                              <span className="text-[11px] font-bold truncate max-w-[200px]">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Document ${i+1}`)}</span>
+                              <span className="text-[11px] font-bold truncate max-w-[200px] text-[#002147] dark:text-white">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Document ${i+1}`)}</span>
                            </div>
                            <div className="flex gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 text-blue-600" onClick={() => window.open(`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`, '_blank')}><Eye className="w-4 h-4" /></Button>
-                              <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400" onClick={() => window.open(`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`, '_blank')}><Eye className="w-4 h-4" /></Button>
+                              <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                            </div>
                         </div>
                       ))}
@@ -360,21 +360,21 @@ export default function LRODashboard() {
                    <p className="text-[10px] font-bold text-emerald-600 uppercase px-1 mb-2">Notary Verified Drafts &amp; Receipts</p>
                    <div className="grid grid-cols-1 gap-2">
                       {selectedRequest?.buyerDocuments?.map((doc, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/20 border-emerald-100 shadow-sm">
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-800/30 shadow-sm">
                            <div className="flex items-center gap-3">
                               <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                              <span className="text-[11px] font-bold truncate max-w-[200px]">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Certified_Dossier_${i+1}`)}</span>
+                              <span className="text-[11px] font-bold truncate max-w-[200px] text-[#002147] dark:text-white">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Certified_Dossier_${i+1}`)}</span>
                            </div>
                            <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                       ))}
                       {selectedRequest?.paymentReceipt && (
-                        <div className="flex items-center justify-between p-3 rounded-xl border bg-amber-50/20 border-amber-100 shadow-sm">
+                        <div className="flex items-center justify-between p-3 rounded-xl border bg-amber-50/20 dark:bg-amber-950/10 border-amber-100 dark:border-amber-800/30 shadow-sm">
                            <div className="flex items-center gap-3">
                               <CreditCard className="w-4 h-4 text-amber-600" />
                               <span className="text-[11px] font-bold">Payment Receipt</span>
                            </div>
-                           <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="p-2 hover:bg-amber-50 text-amber-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="p-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                       )}
                    </div>
@@ -383,12 +383,12 @@ export default function LRODashboard() {
              </div>
           </div>
 
-          <DialogFooter className="p-4 bg-muted/30 border-t flex flex-col sm:flex-row gap-2">
+          <DialogFooter className="p-4 bg-muted/30 dark:bg-slate-800/50 border-t dark:border-white/10 flex flex-col sm:flex-row gap-2">
              {selectedRequest?.status === 'Completed' ? (
                 <div className="w-full flex flex-col gap-3">
-                   <div className="flex items-center justify-center p-3 bg-emerald-50 border border-emerald-200 rounded-xl gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      <p className="text-xs font-bold text-emerald-800 uppercase tracking-tight">Transfer Finalized & Certified</p>
+                   <div className="flex items-center justify-center p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-tight">Transfer Finalized & Certified</p>
                    </div>
                    <Button 
                       variant="outline" 
@@ -429,8 +429,8 @@ export default function LRODashboard() {
                          </Badge>
                       </div>
                    ) : (
-                      <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-lg border border-gray-200">
-                         <Badge className="bg-gray-500 text-white text-[9px] uppercase font-black">Returned</Badge>
+                      <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-200 dark:border-white/10">
+                         <Badge className="bg-gray-500 dark:bg-slate-600 text-white text-[9px] uppercase font-black">Returned</Badge>
                       </div>
                    )}
 
@@ -460,7 +460,7 @@ export default function LRODashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-             <Label htmlFor="rejectReason" className="text-xs font-bold text-gray-500 uppercase">Reason for Rejection</Label>
+             <Label htmlFor="rejectReason" className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Reason for Rejection</Label>
              <Textarea 
                id="rejectReason" 
                placeholder="e.g. Missing buyer ID verification, Plot coordinates mismatch..." 
@@ -493,13 +493,13 @@ export default function LRODashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-             <div className={cn("p-3 rounded-xl border text-xs", disputeTarget?.status === 'disputed' ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-700")}>
+             <div className={cn("p-3 rounded-xl border text-xs", disputeTarget?.status === 'disputed' ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/30 text-emerald-700 dark:text-emerald-400" : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/30 text-amber-700 dark:text-amber-400")}>
                 {disputeTarget?.status === 'disputed' 
                   ? "Are you sure you want to lift the dispute? This will allow administrative processes to resume." 
                   : "Marking this land as 'Disputed' will block any ongoing transfers or authorizations immediately."}
              </div>
              <div className="space-y-2">
-                <Label htmlFor="disputeReason" className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Administrative Reason / Feedback</Label>
+                <Label htmlFor="disputeReason" className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Administrative Reason / Feedback</Label>
                 <Textarea 
                   id="disputeReason" 
                   placeholder={disputeTarget?.status === 'disputed' ? "Reason for lifting dispute..." : "Reason for dispute (e.g., Ownership contestation, Court order)..."}

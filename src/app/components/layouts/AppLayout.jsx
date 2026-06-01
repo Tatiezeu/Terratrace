@@ -1,19 +1,45 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopNav } from "./TopNav";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { toast } from "sonner";
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user: rawUser, loading } = useAuth();
-  
-  const [user, setUser] = useState({
-    role: "loading...",
-    name: "User",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
-  });
+  const { user: rawUser, loading, updateUser } = useAuth();
+
+  const user = useMemo(() => {
+    if (!rawUser) {
+      return {
+        role: "loading...",
+        name: "User",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
+      };
+    }
+    
+    let avatarUrl = "";
+    if (rawUser.profilePic === 'default-profile.png') {
+      avatarUrl = 'http://localhost:5001/assets/default-profile.png';
+    } else if (rawUser.profilePic) {
+      const isAbsolute = rawUser.profilePic.startsWith('http') || rawUser.profilePic.startsWith('data:');
+      avatarUrl = isAbsolute ? rawUser.profilePic : `http://localhost:5001/${rawUser.profilePic.startsWith('/') ? rawUser.profilePic.substring(1) : rawUser.profilePic}`;
+      
+      // Inject Cloudinary face crop transformations for a sleek navbar presentation
+      if (avatarUrl.includes("cloudinary.com") && avatarUrl.includes("/image/upload/")) {
+        avatarUrl = avatarUrl.replace("/image/upload/", "/image/upload/c_thumb,g_face,w_200,h_200/");
+      }
+    } else {
+      avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`;
+    }
+
+    const isAbsolute = rawUser.profilePic && (rawUser.profilePic.startsWith('http') || rawUser.profilePic.startsWith('data:'));
+    return {
+      role: rawUser.role,
+      name: `${rawUser.firstName} ${rawUser.lastName}`,
+      avatar: isAbsolute ? avatarUrl : (rawUser.profilePic ? `${avatarUrl}?t=${Date.now()}` : avatarUrl),
+    };
+  }, [rawUser]);
 
   useEffect(() => {
     if (!loading && !rawUser) {
@@ -21,16 +47,6 @@ export default function AppLayout() {
     }
 
     if (rawUser) {
-      const avatarUrl = rawUser.profilePic 
-        ? (rawUser.profilePic.startsWith('http') ? rawUser.profilePic : `http://localhost:5001${rawUser.profilePic}`)
-        : `https://api.dicebear.com/7.x/avataaars/svg?seed=${rawUser.firstName}`;
-
-      setUser({
-        role: rawUser.role,
-        name: `${rawUser.firstName} ${rawUser.lastName}`,
-        avatar: `${avatarUrl}?t=${Date.now()}`,
-      });
-
       const welcomeKey = `welcome_shown_${rawUser._id || rawUser.id}`;
       if (!sessionStorage.getItem(welcomeKey)) {
         setTimeout(() => {
@@ -44,7 +60,7 @@ export default function AppLayout() {
   }, [rawUser, loading, navigate]);
 
   const handleRoleChange = (newRole) => {
-    setUser((prev) => ({ ...prev, role: newRole }));
+    updateUser({ role: newRole });
   };
 
   return (

@@ -13,7 +13,8 @@ import {
   Database,
   Activity,
   UserX,
-  ScrollText
+  ScrollText,
+  FileSearch
 } from "lucide-react";
 import { cn } from "../ui/utils";
 import { motion } from "motion/react";
@@ -37,6 +38,12 @@ const navItems = [
     icon: <MapPin className="w-5 h-5" />,
     path: "/dashboard/my-land-plots",
     roles: ["Landowner", "SuperAdmin"],
+  },
+  {
+    label: "Track Applications",
+    icon: <FileSearch className="w-5 h-5" />,
+    path: "/dashboard/applications",
+    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
   },
   {
     label: "Registry Officer",

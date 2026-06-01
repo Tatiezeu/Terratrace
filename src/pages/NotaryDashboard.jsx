@@ -149,11 +149,11 @@ export default function NotaryDashboard() {
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147]">Notary Officer Portal</h1>
+          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-white">Notary Officer Portal</h1>
           <p className="text-muted-foreground mt-1">Legitimize and verify regional land transactions.</p>
         </div>
         <div className="flex gap-3">
-          <Badge className="bg-blue-50 text-blue-700 border-blue-200 px-4 py-2 font-bold uppercase tracking-wider text-[10px]">
+          <Badge className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40 px-4 py-2 font-bold uppercase tracking-wider text-[10px]">
             <ShieldCheck className="w-4 h-4 mr-2" /> Regional Authority
           </Badge>
         </div>
@@ -163,13 +163,13 @@ export default function NotaryDashboard() {
         <div className="lg:col-span-3 space-y-6">
           
           {/* Ongoing Cases */}
-          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white">
-            <CardHeader className="border-b bg-muted/30 py-4 flex flex-row items-center justify-between">
+          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10">
+            <CardHeader className="border-b bg-muted/30 dark:bg-slate-800/50 dark:border-white/10 py-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2">
-                  <Timer className="w-5 h-5 text-emerald-600" /> Ongoing Cases &amp; Verifications
+                  <Timer className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> Ongoing Cases &amp; Verifications
                 </CardTitle>
-                <CardDescription>Applications currently under your supervision.</CardDescription>
+                <CardDescription className="dark:text-gray-400">Applications currently under your supervision.</CardDescription>
               </div>
               <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -182,16 +182,16 @@ export default function NotaryDashboard() {
                   <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 transition-all group">
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                        req.status === 'Payment_Submitted' || req.status === 'Payment_Verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                        req.status === 'Payment_Submitted' || req.status === 'Payment_Verified' ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' : 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400'
                       }`}>
                         {req.status === 'Payment_Submitted' || req.status === 'Payment_Verified' ? <FileCheck className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
                       </div>
                       <div>
-                        <h4 className="font-bold text-[#002147] group-hover:text-emerald-600 transition-colors">{req.plot.landCode}</h4>
+                        <h4 className="font-bold text-[#002147] dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{req.plot.landCode}</h4>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Badge className={cn("text-[9px] uppercase border-none", 
-                            req.status === 'Payment_Verified' ? "bg-emerald-600 text-white" : 
-                            req.status === 'Payment_Submitted' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                            req.status === 'Payment_Verified' ? "bg-emerald-600 text-white dark:bg-emerald-700" : 
+                            req.status === 'Payment_Submitted' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                           )}>
                             {req.status.replace(/_/g, ' ')}
                           </Badge>
@@ -212,7 +212,7 @@ export default function NotaryDashboard() {
                       {req.status === 'Payment_Verified' && (
                         <Button onClick={() => { setSelectedRequest(req); setIsForwardModalOpen(true); }} className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white rounded-lg h-9 px-6 font-bold flex items-center gap-2">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => { setSelectedRequest(req); setIsDetailsOpen(true); }} className="h-9 w-9 text-blue-600 hover:bg-blue-50 border border-blue-100 rounded-lg"><Eye className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setSelectedRequest(req); setIsDetailsOpen(true); }} className="h-9 w-9 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 rounded-lg"><Eye className="w-4 h-4" /></Button>
                     </div>
                   </div>
                 ))}
@@ -222,21 +222,21 @@ export default function NotaryDashboard() {
           </Card>
 
           {/* Verification Queue (New Requests) */}
-          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white/50 backdrop-blur-sm">
-            <CardHeader className="bg-muted/20 py-4 border-b">
-              <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2 text-blue-800">
+          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-sm dark:border dark:border-white/10">
+            <CardHeader className="bg-muted/20 dark:bg-slate-800/50 py-4 border-b dark:border-white/10">
+              <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2 text-blue-800 dark:text-blue-300">
                 <FileSignature className="w-5 h-5" /> Incoming Requests Queue
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
                <div className="divide-y divide-border/50">
                   {pendingQueue.map(req => (
-                    <div key={req._id} className="p-5 flex items-center justify-between hover:bg-white transition-all">
+                    <div key={req._id} className="p-5 flex items-center justify-between hover:bg-white dark:hover:bg-white/5 transition-all">
                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600"><FileText className="w-5 h-5" /></div>
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400"><FileText className="w-5 h-5" /></div>
                           <div>
-                             <h4 className="font-bold text-sm">{req.plot.landCode}</h4>
-                             <p className="text-[10px] text-muted-foreground">Submitted by {req.sender.firstName} {req.sender.lastName} · {new Date(req.createdAt).toLocaleDateString()}</p>
+                             <h4 className="font-bold text-sm text-[#002147] dark:text-white">{req.plot.landCode}</h4>
+                             <p className="text-[10px] text-muted-foreground dark:text-gray-400">Submitted by {req.sender.firstName} {req.sender.lastName} · {new Date(req.createdAt).toLocaleDateString()}</p>
                           </div>
                        </div>
                        <Button onClick={() => handleUpdateStatus(req._id, 'Under_Verification')} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-lg px-4 text-xs font-bold">Initiate Verification</Button>
@@ -280,10 +280,10 @@ export default function NotaryDashboard() {
             <DialogDescription>Overview of all documents submitted and generated for this transaction.</DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4 overflow-y-auto max-h-[70vh] pr-2">
-             <div className="grid grid-cols-3 gap-4 bg-muted/40 p-4 rounded-xl">
-                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Plot Code</Label><p className="font-bold text-sm">{selectedRequest?.plot.landCode}</p></div>
-                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Initiator</Label><p className="font-bold text-sm">{selectedRequest?.sender.firstName} {selectedRequest?.sender.lastName}</p></div>
-                <div><Label className="text-[10px] uppercase font-black text-muted-foreground">Type</Label><Badge className="bg-blue-100 text-blue-700 border-none uppercase text-[9px]">{selectedRequest?.transferType}</Badge></div>
+             <div className="grid grid-cols-3 gap-4 bg-muted/40 dark:bg-white/5 p-4 rounded-xl">
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground dark:text-gray-400">Plot Code</Label><p className="font-bold text-sm text-[#002147] dark:text-white">{selectedRequest?.plot.landCode}</p></div>
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground dark:text-gray-400">Initiator</Label><p className="font-bold text-sm text-[#002147] dark:text-white">{selectedRequest?.sender.firstName} {selectedRequest?.sender.lastName}</p></div>
+                <div><Label className="text-[10px] uppercase font-black text-muted-foreground dark:text-gray-400">Type</Label><Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-none uppercase text-[9px] block w-fit">{selectedRequest?.transferType}</Badge></div>
              </div>
 
              <div className="space-y-4">
@@ -293,14 +293,14 @@ export default function NotaryDashboard() {
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                    {selectedRequest?.clientDocuments?.map((doc, i) => (
-                     <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-white shadow-sm hover:shadow-md transition-all">
+                     <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-white/5 dark:border-white/10 shadow-sm hover:shadow-md transition-all">
                         <div className="flex items-center gap-3 overflow-hidden">
                            <FileText className="w-5 h-5 text-blue-500 shrink-0" />
-                           <span className="text-xs font-bold truncate">{doc.split('/').pop()}</span>
+                           <span className="text-xs font-bold truncate text-[#002147] dark:text-white">{doc.split('/').pop()}</span>
                         </div>
                         <div className="flex gap-2">
-                           <a href={`http://localhost:5001${doc}`} target="_blank" className="p-2 hover:bg-blue-50 text-blue-600 rounded-lg"><Eye className="w-4 h-4" /></a>
-                           <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${doc}`} target="_blank" className="p-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg"><Eye className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                      </div>
                    ))}
@@ -311,16 +311,16 @@ export default function NotaryDashboard() {
                <div className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2 pt-4">
                      <h4 className="font-bold text-sm flex items-center gap-2 text-emerald-600"><ShieldCheck className="w-4 h-4" /> Notary Certified Dossier</h4>
-                     <Badge className="bg-emerald-100 text-emerald-700 border-none text-[9px]">Verified</Badge>
+                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none text-[9px]">Verified</Badge>
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                      {[...(selectedRequest?.buyerDocuments || []), ...(selectedRequest?.certifiedDocuments || [])].map((doc, i) => (
-                       <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/20 border-emerald-100">
+                       <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-100 dark:border-emerald-800/30">
                           <div className="flex items-center gap-3 overflow-hidden">
                              <FileCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                              <span className="text-xs font-bold truncate italic">{doc.split('/').pop()}</span>
                           </div>
-                          <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                          <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                        </div>
                      ))}
                   </div>
@@ -332,7 +332,7 @@ export default function NotaryDashboard() {
                   <div className="flex items-center justify-between border-b pb-2">
                      <h4 className="font-bold text-sm flex items-center gap-2 text-amber-600"><CreditCard className="w-4 h-4" /> Payment Receipt</h4>
                   </div>
-                  <div className="flex items-center justify-between p-4 rounded-xl border bg-amber-50/30 border-amber-100">
+                  <div className="flex items-center justify-between p-4 rounded-xl border bg-amber-50/30 dark:bg-amber-950/10 border-amber-100 dark:border-amber-800/30">
                      <div className="flex items-center gap-3">
                         <Badge className="bg-amber-500 text-white p-2 rounded-lg"><CheckCircle2 className="w-4 h-4" /></Badge>
                         <div>
@@ -340,7 +340,7 @@ export default function NotaryDashboard() {
                            <p className="text-[10px] text-muted-foreground">Uploaded by client</p>
                         </div>
                      </div>
-                     <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="flex items-center gap-2 px-4 py-2 bg-white text-amber-600 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-50 transition-colors"><Download className="w-4 h-4" /> Save Receipt</a>
+                     <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"><Download className="w-4 h-4" /> Save Receipt</a>
                   </div>
                </div>
              )}
@@ -358,11 +358,11 @@ export default function NotaryDashboard() {
             <DialogDescription>Confirm processing fee receipt and upload the final certified land transfer documents.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-             <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm"><CreditCard className="w-5 h-5 text-emerald-600" /></div>
+             <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/30 p-4 rounded-xl flex items-center gap-3">
+                <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm"><CreditCard className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
                 <div>
-                   <p className="text-xs font-bold text-emerald-800">Verify Processing Fee</p>
-                   <p className="text-[10px] text-emerald-600 opacity-80">Ensure the amount matches the fee notice sent to the client.</p>
+                   <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Verify Processing Fee</p>
+                   <p className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-80">Ensure the amount matches the fee notice sent to the client.</p>
                 </div>
              </div>
              
@@ -387,7 +387,7 @@ export default function NotaryDashboard() {
                 {certifiedDocs.length > 0 && (
                    <div className="flex flex-wrap gap-2 pt-2">
                       {certifiedDocs.map((f, i) => (
-                        <Badge key={i} variant="secondary" className="text-[9px] gap-1 px-2 py-1 bg-white border border-emerald-200">
+                        <Badge key={i} variant="secondary" className="text-[9px] gap-1 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40">
                            <FileCheck className="w-3 h-3 text-emerald-600" /> {f.name}
                            <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i))} />
                         </Badge>
@@ -456,7 +456,7 @@ export default function NotaryDashboard() {
                    </SelectContent>
                 </Select>
              </div>
-             <div className="bg-blue-50 p-4 rounded-xl text-xs text-blue-700 italic border border-blue-100 flex gap-2">
+             <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-xl text-xs text-blue-700 dark:text-blue-400 italic border border-blue-100 dark:border-blue-800/30 flex gap-2">
                 <ShieldCheck className="w-5 h-5 shrink-0 opacity-50" />
                 "By forwarding, you certify that the transaction is legally valid and the dossier is complete for final registry entry."
              </div>

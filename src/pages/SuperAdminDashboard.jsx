@@ -153,7 +153,7 @@ export default function SuperAdminDashboard() {
             <h2 className="text-2xl font-bold font-['Syne']">State Land Portfolio</h2>
             <p className="text-muted-foreground text-sm">Public land plots currently owned by the Government of Cameroon</p>
           </div>
-          <Badge className="bg-amber-100 text-amber-700 border-0">{statePlots.length} Plots Managed</Badge>
+          <Badge className="bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/30 dark:text-amber-400">{statePlots.length} Plots Managed</Badge>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -175,7 +175,7 @@ export default function SuperAdminDashboard() {
                   <p className="font-bold text-sm mt-1 truncate">{plot.location}</p>
                   <div className="flex items-center justify-between mt-3 pt-3 border-t">
                     <span className="text-xs text-muted-foreground">{plot.area}m²</span>
-                    <Badge variant="outline" className="text-[9px] uppercase border-amber-200 text-amber-700 bg-amber-50">
+                    <Badge variant="outline" className="text-[9px] uppercase border-amber-200 text-amber-700 bg-amber-50 dark:border-amber-700/50 dark:text-amber-400 dark:bg-amber-900/30">
                       {plot.status}
                     </Badge>
                   </div>
@@ -239,7 +239,7 @@ export default function SuperAdminDashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className={`text-[10px] uppercase ${officer.role === "Notary" ? "border-purple-300 text-purple-700 bg-purple-50" : "border-blue-300 text-blue-700 bg-blue-50"}`}>
+                        <Badge variant="outline" className={`text-[10px] uppercase ${officer.role === "Notary" ? "border-purple-300 text-purple-700 bg-purple-50 dark:border-purple-700/50 dark:text-purple-400 dark:bg-purple-900/30" : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700/50 dark:text-blue-400 dark:bg-blue-900/30"}`}>
                           {officer.role}
                         </Badge>
                       </td>
@@ -248,7 +248,7 @@ export default function SuperAdminDashboard() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <div className={`w-1.5 h-1.5 rounded-full ${officer.status === "active" ? "bg-emerald-500" : "bg-red-400"}`} />
-                          <span className={`text-[10px] font-bold uppercase ${officer.status === "active" ? "text-emerald-700" : "text-red-600"}`}>
+                          <span className={`text-[10px] font-bold uppercase ${officer.status === "active" ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                             {officer.status}
                           </span>
                         </div>
@@ -263,8 +263,8 @@ export default function SuperAdminDashboard() {
 
         {/* System Notifications & Logs */}
         <div className="space-y-6">
-          <Card className="border-emerald-100 shadow-emerald-500/5">
-            <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/30">
+          <Card className="border-emerald-100 shadow-emerald-500/5 dark:border-emerald-900/40">
+            <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-950/20">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-emerald-600" />
@@ -283,7 +283,7 @@ export default function SuperAdminDashboard() {
                   notifications.map((n) => (
                     <div key={n._id} className={cn(
                       "p-4 hover:bg-accent/30 transition-colors group relative",
-                      n.status === 'unread' ? "bg-emerald-50/40" : ""
+                      n.status === 'unread' ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""
                     )}>
                       <div className="flex items-start gap-3">
                         <div className={cn(
@@ -293,7 +293,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-foreground flex items-center gap-2">
                             {n.title}
-                            {n.type === 'unblock_request' && <Badge variant="outline" className="text-[8px] bg-red-50 text-red-600 border-red-200">UNBLOCK REQ</Badge>}
+                            {n.type === 'unblock_request' && <Badge variant="outline" className="text-[8px] bg-red-50 text-red-600 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700/50">UNBLOCK REQ</Badge>}
                           </p>
                           <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                           <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium tracking-wider">
@@ -302,11 +302,11 @@ export default function SuperAdminDashboard() {
                         </div>
                         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {n.status === 'unread' && (
-                            <Button onClick={() => handleNotifAction(n._id, 'read')} variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50">
+                            <Button onClick={() => handleNotifAction(n._id, 'read')} variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40">
                               <CheckCircle2 className="w-3.5 h-3.5" />
                             </Button>
                           )}
-                          <Button onClick={() => handleNotifAction(n._id, 'delete')} variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50">
+                          <Button onClick={() => handleNotifAction(n._id, 'delete')} variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40">
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>

@@ -4,10 +4,14 @@ import { TopNav } from "./TopNav";
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { GlobalLoadingBar } from "../shared/GlobalLoadingBar";
+import { logActivity } from "../../../utils/logger";
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user: rawUser, loading, updateUser } = useAuth();
+  const { user: rawUser, loading, updateUser, clearAuth } = useAuth();
+  const queryClient = useQueryClient();
 
   const user = useMemo(() => {
     if (!rawUser) {
@@ -63,15 +67,39 @@ export default function AppLayout() {
     updateUser({ role: newRole });
   };
 
+  /**
+   * handleLogout — Clears ALL session data:
+   * 1. Zustand auth store + localStorage token
+   * 2. React Query cache (no stale land/user data after logout)
+   * 3. Zustand persist blob
+   */
+  const handleLogout = () => {
+    // Log logout before purging session data
+    if (rawUser) {
+      logActivity('Auth', `User '${rawUser.firstName} ${rawUser.lastName}' logged out`);
+    }
+    // Clear React Query cache first to wipe sensitive data
+    queryClient.clear();
+    // Clear auth state (Zustand + localStorage)
+    clearAuth();
+    // Belt-and-suspenders: remove Zustand persist blob
+    localStorage.removeItem('terratrace-auth-storage');
+    navigate('/login');
+  };
+
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      <Sidebar user={user} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopNav user={user} onRoleChange={handleRoleChange} />
-        <main className="flex-1 overflow-auto p-6">
-          <Outlet />
-        </main>
+    <>
+      {/* Global loading bar — activates for any in-flight query or mutation */}
+      <GlobalLoadingBar />
+      <div className="flex h-screen bg-background overflow-hidden">
+        <Sidebar user={user} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNav user={user} onRoleChange={handleRoleChange} onLogout={handleLogout} />
+          <main className="flex-1 overflow-auto p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

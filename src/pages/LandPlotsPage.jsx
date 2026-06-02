@@ -1,5 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
-import { mockLandPlots, mockOfficers } from "../data/mockData";
+import { useState, useMemo } from "react";
 import api from "../utils/api";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
@@ -24,13 +23,16 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useLandPlots } from "../hooks/useLandData";
+import { logActivity } from "../utils/logger";
 
 export default function LandPlotsPage() {
-  const [plots, setPlots] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ─── Server state via TanStack Query (cached, deduped) ────────────────────
+  const { data: plots = [], isLoading: loading } = useLandPlots();
+
+  // ─── UI state ─────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("All");
-  const [priceRange, setPriceRange] = useState([0, 100000000]); // Temporary default
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,26 +40,12 @@ export default function LandPlotsPage() {
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
 
-  useEffect(() => {
-    const fetchPlots = async () => {
-      try {
-        const response = await api.get('/land');
-        if (response.data.success) {
-          setPlots(response.data.data);
-          // Update price range if plots exist
-          if (response.data.data.length > 0) {
-            const max = Math.max(...response.data.data.map(p => p.price));
-            setPriceRange([0, max]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch plots:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPlots();
-  }, []);
+  // ─── Derive priceRange max from cached plots data ────────────────────────
+  const maxPrice = useMemo(() => {
+    if (!plots.length) return 100000000;
+    return Math.max(...plots.map(p => p.price || 0));
+  }, [plots]);
+  const [priceRange, setPriceRange] = useState([0, 100000000]);
 
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
@@ -96,6 +84,7 @@ export default function LandPlotsPage() {
   const handleSeeMore = (plot) => {
     setSelectedPlot(plot);
     setIsModalOpen(true);
+    logActivity('Read', `User viewed details for Plot '${plot.landCode}'`);
   };
 
   const handleInitiateTransfer = (plot) => {
@@ -106,6 +95,7 @@ export default function LandPlotsPage() {
   const handleView360 = (plot) => {
     setMatterportPlot(plot);
     setIs360Open(true);
+    logActivity('Read', `User viewed 360 virtual tour for Plot '${plot.landCode}'`);
   };
 
   return (
@@ -285,7 +275,7 @@ export default function LandPlotsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPlots.map((plot) => (
             <LandPlotCard
-              key={plot.id}
+              key={plot._id || plot.id}
               plot={plot}
               onSeeMore={handleSeeMore}
               onInitiateTransfer={handleInitiateTransfer}

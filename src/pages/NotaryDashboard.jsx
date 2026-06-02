@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { 
   Gavel, 
   FileText, 
@@ -43,11 +43,21 @@ import { useAuth } from "../context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../app/components/ui/select";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../app/components/ui/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMyTransfers } from "../hooks/useTransferData";
+import { useRecipients } from "../hooks/useNotificationsData";
 
 export default function NotaryDashboard() {
   const { user: currentUser } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // ─── Server state via TanStack Query ─────────────────────────────────────────
+  const { data: requests = [] } = useMyTransfers();
+  const { data: allRecipients = [] } = useRecipients();
+
+  // ─── Derive LRO list from cached recipients ───────────────────────────────
+  const lros = useMemo(() => allRecipients.filter(u => u.role === "LRO"), [allRecipients]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
   
@@ -62,34 +72,7 @@ export default function NotaryDashboard() {
   const [feeDesc, setFeeDesc] = useState("");
   const [buyerDocs, setBuyerDocs] = useState([]);
   const [certifiedDocs, setCertifiedDocs] = useState([]);
-  const [lros, setLros] = useState([]);
   const [selectedLro, setSelectedLro] = useState("");
-
-  const fetchRequests = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/transfer/my-transfers');
-      if (res.data.success) setRequests(res.data.data);
-    } catch (err) {
-      toast.error("Failed to fetch requests");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchLros = async () => {
-    try {
-      const res = await api.get('/users/recipients?role=LRO');
-      if (res.data.success) setLros(res.data.data);
-    } catch (err) {
-      console.error("Failed to fetch LROs");
-    }
-  };
-
-  useEffect(() => {
-    fetchRequests();
-    fetchLros();
-  }, []);
 
   const handleUpdateStatus = async (requestId, status, additionalData = {}) => {
     try {
@@ -123,7 +106,7 @@ export default function NotaryDashboard() {
 
       if (res.data.success) {
         toast.success(`Application updated to ${status.replace(/_/g, ' ')}`);
-        fetchRequests();
+        queryClient.invalidateQueries({ queryKey: ['transfers'] });
         setIsVerificationOpen(false);
         setIsFeeModalOpen(false);
         setIsForwardModalOpen(false);
@@ -381,15 +364,26 @@ export default function NotaryDashboard() {
                      type="file" 
                      multiple 
                      className="hidden" 
-                     onChange={(e) => setCertifiedDocs(Array.from(e.target.files))} 
+                     onChange={(e) => setCertifiedDocs(prev => [...prev, ...Array.from(e.target.files)])} 
                    />
                 </div>
                 {certifiedDocs.length > 0 && (
                    <div className="flex flex-wrap gap-2 pt-2">
                       {certifiedDocs.map((f, i) => (
-                        <Badge key={i} variant="secondary" className="text-[9px] gap-1 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40">
-                           <FileCheck className="w-3 h-3 text-emerald-600" /> {f.name}
-                           <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i))} />
+                        <Badge key={i} variant="secondary" className="text-[9px] gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40 flex items-center">
+                           <FileCheck className="w-3 h-3 text-emerald-600 shrink-0" /> 
+                           <span className="truncate max-w-[150px]">{f.name}</span>
+                           <button
+                             type="button"
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i));
+                             }}
+                             className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center shrink-0"
+                           >
+                             <X className="w-3 h-3" />
+                           </button>
                         </Badge>
                       ))}
                    </div>
@@ -424,10 +418,31 @@ export default function NotaryDashboard() {
                 <Label>Description</Label>
                 <Textarea placeholder="Registration fees and notary charges..." value={feeDesc} onChange={e => setFeeDesc(e.target.value)} className="rounded-xl" />
              </div>
-             <div className="space-y-2">
-                <Label>Draft Documents (Review copies)</Label>
-                <Input type="file" multiple onChange={e => setBuyerDocs(Array.from(e.target.files))} className="h-11 border-dashed pt-2.5 rounded-xl" />
-             </div>
+              <div className="space-y-2">
+                 <Label>Draft Documents (Review copies)</Label>
+                 <Input type="file" id="draft_upload" multiple onChange={e => setBuyerDocs(prev => [...prev, ...Array.from(e.target.files)])} className="h-11 border-dashed pt-2.5 rounded-xl" />
+                 {buyerDocs.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                       {buyerDocs.map((f, i) => (
+                         <Badge key={i} variant="secondary" className="text-[9px] gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40 flex items-center">
+                            <FileCheck className="w-3 h-3 text-emerald-600 shrink-0" /> 
+                            <span className="truncate max-w-[150px]">{f.name}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setBuyerDocs(buyerDocs.filter((_, idx) => idx !== i));
+                              }}
+                              className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center shrink-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                         </Badge>
+                       ))}
+                    </div>
+                 )}
+              </div>
           </div>
           <DialogFooter>
              <Button onClick={() => handleUpdateStatus(selectedRequest._id, 'Awaiting_Fee_Payment', { 

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   MapPin, Calendar, Clock, Search, Filter, AlertCircle,
   ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send, Eye, Timer, Trash2
@@ -16,13 +16,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import api from "../utils/api";
-import { useEffect } from "react";
 import { cn } from "../app/components/ui/utils";
 import { useAuth } from "../context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePublicNotices } from "../hooks/useTransferData";
 
 export default function NoticeBoardPage() {
   const { user } = useAuth();
-  const [notices, setNotices] = useState([]);
+  const queryClient = useQueryClient();
+
+  // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
+  const { data: notices = [] } = usePublicNotices();
+
+  // ─── UI state ─────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -30,38 +36,24 @@ export default function NoticeBoardPage() {
   const [selectedNotice, setSelectedNotice] = useState(null);
   const [objectionMsg, setObjectionMsg] = useState("");
   const [countdownOpen, setCountdownOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [clearNoticesConfirmOpen, setClearNoticesConfirmOpen] = useState(false);
 
-  const fetchNotices = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/transfer/public-notices');
-      if (res.data.success) setNotices(res.data.data);
-    } catch (err) {
-      toast.error("Failed to fetch public notices");
-    } finally {
-      setLoading(false);
-    }
+  const handleClearAllNotices = () => {
+    setClearNoticesConfirmOpen(true);
   };
 
-  const handleClearAllNotices = async () => {
-    if (!window.confirm("Are you absolutely sure you want to permanently clear ALL public notices from the database? This action cannot be undone.")) {
-      return;
-    }
+  const executeClearAllNotices = async () => {
     try {
       const res = await api.delete('/transfer/public-notices');
       if (res.data.success) {
         toast.success(res.data.message || "All public notices cleared successfully!");
-        setNotices([]);
+        setClearNoticesConfirmOpen(false);
+        queryClient.invalidateQueries({ queryKey: ['transfers', 'public-notices'] });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to clear public notices");
     }
   };
-
-  useEffect(() => {
-    fetchNotices();
-  }, []);
 
   const filteredNotices = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -315,6 +307,33 @@ export default function NoticeBoardPage() {
           <Button onClick={() => setCountdownOpen(false)} className="w-full bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white h-12 rounded-xl text-sm font-bold uppercase tracking-widest">
             Close View
           </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR ALL NOTICES CONFIRMATION DIALOG */}
+      <Dialog open={clearNoticesConfirmOpen} onOpenChange={setClearNoticesConfirmOpen}>
+        <DialogContent className="max-w-md bg-white rounded-2xl border-none shadow-2xl p-0 overflow-hidden dark:bg-slate-900">
+          <div className="bg-red-500 p-6 flex flex-col items-center text-white text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Notices Registry</DialogTitle>
+            <DialogDescription className="text-white/80 mt-1">This will permanently clear all public transfer notices.</DialogDescription>
+          </div>
+          <div className="p-8">
+            <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
+              Are you sure you want to clear ALL public notices from the database?
+            </p>
+            <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
+              This action is permanent and cannot be undone. All active and expired notices will be permanently deleted from the secure database.
+            </p>
+          </div>
+          <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">
+            <Button variant="ghost" onClick={() => setClearNoticesConfirmOpen(false)} className="flex-1 rounded-xl h-11">No, Keep Notices</Button>
+            <Button onClick={executeClearAllNotices} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
+              Yes, Clear All
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

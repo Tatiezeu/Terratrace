@@ -12,6 +12,8 @@ import './styles/index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 30 * 1000,       // 30 seconds before data is considered stale
+      gcTime: 5 * 60 * 1000,      // 5 minutes garbage collection time
       refetchOnWindowFocus: false,
       retry: 1,
     },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileSearch, 
@@ -21,9 +21,8 @@ import { Badge } from '../app/components/ui/badge';
 import { Button } from '../app/components/ui/button';
 import { Input } from '../app/components/ui/input';
 import { toast } from 'sonner';
-import api from '../utils/api';
-import { mockTransferRequests } from '../data/mockData';
 import { useAuth } from '../context/AuthContext';
+import { useMyTransfers } from '../hooks/useTransferData';
 
 /**
  * ApplicationTracking Page Component
@@ -34,10 +33,31 @@ export default function ApplicationTracking() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState(null);
   const [clickedStep, setClickedStep] = useState({}); // Stores { [appId]: stepId }
+
+  // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
+  const { data: rawTransfers = [], isLoading: loading } = useMyTransfers();
+
+  // ─── Normalize backend status enum to local display enum ─────────────────
+  const applications = useMemo(() => {
+    return rawTransfers.map(app => ({
+      id: app._id,
+      landCode: app.plot?.landCode || "Unknown Code",
+      buyerName: app.receiver ? `${app.receiver.firstName} ${app.receiver.lastName}` : "Unknown Buyer",
+      status: app.status === 'Initiated' ? 'pending' : 
+              app.status === 'Under_Verification' ? 'pending' : 
+              app.status === 'Awaiting_Fee_Payment' ? 'fee_pending' : 
+              app.status === 'Payment_Submitted' ? 'fee_pending' : 
+              app.status === 'Payment_Verified' ? 'fee_pending' : 
+              app.status === 'Forwarded_to_LRO' ? 'published' : 
+              app.status === 'Public_Notice' ? 'published' : 
+              app.status === 'Completed' ? 'notary_verified' : app.status,
+      transferType: app.transferType || "purchase",
+      submittedAt: new Date(app.createdAt).toLocaleDateString(),
+      senderId: app.sender?._id || app.sender?.id || app.sender
+    }));
+  }, [rawTransfers]);
 
   const getStepAuditDetails = (stepId, app) => {
     const auditLogs = {
@@ -86,50 +106,12 @@ export default function ApplicationTracking() {
     return auditLogs[stepId];
   };
 
-  useEffect(() => {
-    const fetchApplications = async () => {
-      try {
-        // Fetch active landowner transfer requests from the live backend API
-        const response = await api.get('/transfer/my-transfers').catch(() => null);
-        if (response && response.data?.success) {
-          // Normalize the backend Mongoose TransferRequest schemas into the local unified properties
-          const mapped = response.data.data.map(app => ({
-            id: app._id,
-            landCode: app.plot?.landCode || "Unknown Code",
-            buyerName: app.receiver ? `${app.receiver.firstName} ${app.receiver.lastName}` : "Unknown Buyer",
-            status: app.status === 'Initiated' ? 'pending' : 
-                    app.status === 'Under_Verification' ? 'pending' : 
-                    app.status === 'Awaiting_Fee_Payment' ? 'fee_pending' : 
-                    app.status === 'Payment_Submitted' ? 'fee_pending' : 
-                    app.status === 'Payment_Verified' ? 'fee_pending' : 
-                    app.status === 'Forwarded_to_LRO' ? 'published' : 
-                    app.status === 'Public_Notice' ? 'published' : 
-                    app.status === 'Completed' ? 'notary_verified' : app.status,
-            transferType: app.transferType || "purchase",
-            submittedAt: new Date(app.createdAt).toLocaleDateString(),
-            senderId: app.sender?._id || app.sender
-          }));
-          setApplications(mapped);
-        } else {
-          // Graceful fallback to Mock Transfer Request registry
-          setApplications(mockTransferRequests.map(app => ({ ...app, senderId: user?.id || user?._id })));
-        }
-      } catch (err) {
-        console.error("Failed to load application history:", err);
-        setApplications(mockTransferRequests);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchApplications();
-  }, []);
-
   // Filter application files based on query strings, dropdown selections, and role authorization
   const filteredApps = applications.filter((app) => {
     // Normal users can only track applications they initiated (senderId === user.id)
     // Admins (SuperAdmin) can track all applications
-    const isAuthorized = user?.role === 'SuperAdmin' || app.senderId === user?._id || app.senderId === user?.id;
+    const isAuthorized = user?.role === 'SuperAdmin' || 
+                         (app.senderId && (String(app.senderId) === String(user?._id) || String(app.senderId) === String(user?.id)));
     if (!isAuthorized) return false;
 
     const matchesSearch = 

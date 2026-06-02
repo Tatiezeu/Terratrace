@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import api from "../utils/api";
 import { 
   Gavel, 
@@ -25,7 +25,8 @@ import {
   History,
   X,
   MapPin,
-  AlertTriangle
+  AlertTriangle,
+  Ban
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -46,6 +47,9 @@ import {
 import { cn } from "../app/components/ui/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLandPlots } from "../hooks/useLandData";
+import { useMyTransfers } from "../hooks/useTransferData";
 
 const statusConfig = {
   cleared:        { label: "Cleared",        color: "bg-emerald-100 text-emerald-700 border-emerald-200", dot: "bg-emerald-500", icon: <CheckCircle2 className="w-6 h-6 text-emerald-500" /> },
@@ -62,29 +66,12 @@ export default function LRODashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStatusFilter, setActiveStatusFilter] = useState(null);
-  const [plots, setPlots] = useState([]);
-  const [transfers, setTransfers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  const queryClient = useQueryClient();
 
-  const fetchData = async () => {
-    try {
-        setLoading(true);
-        const [plotsRes, transRes] = await Promise.all([
-            api.get('/land'),
-            api.get('/transfer/my-transfers')
-        ]);
-        if (plotsRes.data.success) setPlots(plotsRes.data.data);
-        if (transRes.data.success) setTransfers(transRes.data.data);
-    } catch (err) {
-        toast.error("Failed to fetch regional data");
-    } finally {
-        setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // ─── Server state via TanStack Query ─────────────────────────────────────────
+  const { data: plots = [] } = useLandPlots();
+  const { data: transfers = [] } = useMyTransfers();
 
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
@@ -104,7 +91,8 @@ export default function LRODashboard() {
         const res = await api.patch(`/transfer/${requestId}/status`, { status: 'Completed' });
         if (res.data.success) {
             toast.success("Final transfer authorized successfully!");
-            fetchData();
+            queryClient.invalidateQueries({ queryKey: ["land"] });
+            queryClient.invalidateQueries({ queryKey: ["transfers"] });
             setIsApprovalOpen(false);
         }
     } catch (err) {
@@ -121,7 +109,8 @@ export default function LRODashboard() {
         });
         if (res.data.success) {
             toast.info("Application sent back to Notary for re-verification");
-            fetchData();
+            queryClient.invalidateQueries({ queryKey: ["land"] });
+            queryClient.invalidateQueries({ queryKey: ["transfers"] });
             setIsRejectModalOpen(false);
             setIsApprovalOpen(false);
         }
@@ -144,7 +133,8 @@ export default function LRODashboard() {
             feedback: disputeReason 
         });
         toast.success(`Plot marked as ${newStatus}`);
-        fetchData();
+        queryClient.invalidateQueries({ queryKey: ["land"] });
+        queryClient.invalidateQueries({ queryKey: ["transfers"] });
         setIsDisputeModalOpen(false);
         setDisputeReason("");
     } catch (err) {
@@ -221,6 +211,13 @@ export default function LRODashboard() {
                     >
                       <Eye className="w-4 h-4" /> View Summary
                     </Button>
+                  ) : req.status === 'Rejected' ? (
+                    <Button 
+                      disabled
+                      className="bg-red-500/10 border border-red-500/20 text-red-500 dark:bg-red-950/20 dark:border-red-900/30 cursor-not-allowed rounded-lg h-9 px-4 font-bold flex items-center gap-2"
+                    >
+                      <Ban className="w-4 h-4 text-red-500" /> Rejected
+                    </Button>
                   ) : (
                     <Button 
                       onClick={() => { setSelectedRequest(req); setIsApprovalOpen(true); }} 
@@ -281,10 +278,10 @@ export default function LRODashboard() {
       </Card>
 
       {/* Register Landowner Modal */}
-      <RegisterLandownerModal open={isRegisterOpen} onClose={() => { setIsRegisterOpen(false); fetchData(); }} />
+      <RegisterLandownerModal open={isRegisterOpen} onClose={() => { setIsRegisterOpen(false); queryClient.invalidateQueries({ queryKey: ["land"] }); }} />
 
       {/* Publish Notice Modal */}
-      <PublishNoticeModal open={isPublishOpen} onClose={() => { setIsPublishOpen(false); fetchData(); }} request={selectedRequest} />
+      <PublishNoticeModal open={isPublishOpen} onClose={() => { setIsPublishOpen(false); queryClient.invalidateQueries({ queryKey: ["land"] }); queryClient.invalidateQueries({ queryKey: ["transfers"] }); }} request={selectedRequest} />
 
       {/* Dossier Review Modal */}
       <Dialog open={isApprovalOpen} onOpenChange={setIsApprovalOpen}>

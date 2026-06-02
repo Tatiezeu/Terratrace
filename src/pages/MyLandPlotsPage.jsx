@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { mockLandPlots } from "../data/mockData";
+import { useState, useMemo } from "react";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
-import { useEffect, useMemo } from "react";
-import api from "../utils/api";
-import { useAuth } from "../context/AuthContext"; // Assuming AuthContext exists
+import { useAuth } from "../context/AuthContext";
+import { useMyLandPlots } from "../hooks/useLandData";
+import { logActivity } from "../utils/logger";
 
 export default function MyLandPlotsPage() {
   const [selectedPlot, setSelectedPlot] = useState(null);
@@ -13,24 +12,9 @@ export default function MyLandPlotsPage() {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   const { user } = useAuth();
-  const [plots, setPlots] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchMyPlots = async () => {
-      try {
-        const response = await api.get('/land/my-plots');
-        if (response.data.success) {
-          setPlots(response.data.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch my plots:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMyPlots();
-  }, []);
+  // ─── Server state via TanStack Query (cached, deduped) ────────────────────
+  const { data: plots = [] } = useMyLandPlots();
 
   // Filter based on land code owner segment as requested
   const myPlots = useMemo(() => {
@@ -50,6 +34,7 @@ export default function MyLandPlotsPage() {
   const handleSeeMore = (plot) => {
     setSelectedPlot(plot);
     setIsModalOpen(true);
+    logActivity('Read', `User viewed details for Plot '${plot.landCode}'`);
   };
 
   const handleInitiateTransfer = (plot) => {
@@ -69,7 +54,7 @@ export default function MyLandPlotsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {myPlots.map((plot) => (
           <LandPlotCard
-            key={plot.id}
+            key={plot._id || plot.id}
             plot={plot}
             onSeeMore={handleSeeMore}
             onInitiateTransfer={handleInitiateTransfer}

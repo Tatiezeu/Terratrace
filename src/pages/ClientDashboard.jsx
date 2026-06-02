@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
@@ -25,14 +25,17 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { LandCodeInfo } from "../app/components/shared/LandcodeInfo";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
-import api from "../utils/api";
 import { cn } from "../app/components/ui/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { useLandPlots } from "../hooks/useLandData";
+import { useMyTransfers } from "../hooks/useTransferData";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "../app/components/ui/dialog";
+import { logActivity } from "../utils/logger";
 
 const REGION_CODES = [
   { code: "01", name: "Adamaoua", capital: "Ngaoundéré" },
@@ -49,6 +52,14 @@ const REGION_CODES = [
 
 export default function ClientDashboard() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // ─── Server state via TanStack Query (cached, deduped, stale-while-revalidate) ───
+  const { data: plots = [], isFetching: plotsFetching } = useLandPlots();
+  const { data: transfers = [] } = useMyTransfers();
+  const loading = plotsFetching;
+
+  // ─── UI state ────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLocation, setFilterLocation] = useState("all");
   const [filterOwner, setFilterOwner] = useState("");
@@ -60,31 +71,18 @@ export default function ClientDashboard() {
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [plots, setPlots] = useState([]);
-  const [transfers, setTransfers] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    try {
-      const [plotsRes, transfersRes] = await Promise.all([
-        api.get('/land'),
-        api.get('/transfer/my-transfers')
-      ]);
-      
-      if (plotsRes.data.success) setPlots(plotsRes.data.data);
-      if (transfersRes.data.success) setTransfers(transfersRes.data.data);
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    } finally {
-      setLoading(false);
-    }
+  const handleSeeMore = (plot) => {
+    setSelectedPlot(plot);
+    setIsModalOpen(true);
+    logActivity('Read', `User viewed details for Plot '${plot.landCode}'`);
   };
 
-  useEffect(() => {
-    fetchData();
-    window.addEventListener('land-updated', fetchData);
-    return () => window.removeEventListener('land-updated', fetchData);
-  }, []);
+  const handleView360 = (plot) => {
+    setMatterportPlot(plot);
+    setIs360Open(true);
+    logActivity('Read', `User viewed 360 virtual tour for Plot '${plot.landCode}'`);
+  };
 
   const LOCATIONS = [...new Set(plots.map((p) => p.location?.split(",")[1]?.trim()).filter(Boolean))];
 
@@ -183,14 +181,14 @@ export default function ClientDashboard() {
           {view === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {filteredPlots.map(plot => (
-                <LandPlotCard key={plot._id} plot={plot} onSeeMore={setSelectedPlot} onInitiateTransfer={(p) => { setSelectedPlot(p); setIsTransferOpen(true); }} onView360={(p) => { setMatterportPlot(p); setIs360Open(true); }} />
+                <LandPlotCard key={plot._id} plot={plot} onSeeMore={handleSeeMore} onInitiateTransfer={(p) => { setSelectedPlot(p); setIsTransferOpen(true); }} onView360={handleView360} />
               ))}
             </div>
           ) : (
             <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-slate-800/60 dark:border dark:border-white/10">
               <div className="divide-y divide-border">
                 {filteredPlots.map(plot => (
-                  <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-all cursor-pointer" onClick={() => setSelectedPlot(plot)}>
+                  <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-all cursor-pointer" onClick={() => handleSeeMore(plot)}>
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden shrink-0">
                         <img src={plot.coverImage ? `http://localhost:5001${plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover" />
@@ -240,7 +238,13 @@ export default function ClientDashboard() {
         </div>
       </div>
 
-      <TransferRequestModal plot={selectedPlot} open={isTransferOpen} onClose={() => { setIsTransferOpen(false); fetchData(); }} />
+      <TransferRequestModal plot={selectedPlot} open={isTransferOpen} onClose={() => { setIsTransferOpen(false); queryClient.invalidateQueries({ queryKey: ['transfers'] }); queryClient.invalidateQueries({ queryKey: ['land'] }); }} />
+      
+      <LandPlotModal
+        plot={selectedPlot}
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
       
       <Dialog open={is360Open} onOpenChange={setIs360Open}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl">

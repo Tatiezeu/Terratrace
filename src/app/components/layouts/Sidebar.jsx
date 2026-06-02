@@ -19,6 +19,8 @@ import {
 import { cn } from "../ui/utils";
 import { motion } from "motion/react";
 import Logo from "../shared/Logo";
+import { useQuery } from "@tanstack/react-query";
+import api from "../../../utils/api";
 
 const navItems = [
   {
@@ -92,6 +94,42 @@ const navItems = [
 export function Sidebar({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isSuperAdmin = user?.role === "SuperAdmin";
+
+  const { data: allUsers = [], isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['users', 'all'],
+    queryFn: async () => {
+      const response = await api.get('/users');
+      if (!response.data.success) throw new Error('Failed to fetch users');
+      return response.data.data;
+    },
+    enabled: isSuperAdmin,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: activityLogs = [], isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['activity-logs'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/logs');
+        if (response.data && response.data.success) {
+          const serverLogs = response.data.data;
+          const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+          const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
+          const allLogs = [...serverLogs, ...localLogs];
+          const uniqueLogs = Array.from(new Map(allLogs.map(item => [item.id || item._id, item])).values());
+          return uniqueLogs;
+        }
+      } catch (err) {
+        // Fallback to local storage if API call fails
+      }
+      const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+      return localLogsJson ? JSON.parse(localLogsJson) : [];
+    },
+    enabled: isSuperAdmin,
+    staleTime: 5 * 1000,
+  });
 
   const handleLogout = () => {
     localStorage.removeItem('token'); // Clear the JWT token
@@ -171,33 +209,48 @@ export function Sidebar({ user }) {
         })}
 
         {/* System Cards in Sidebar (for Admin only, or specifically on Settings page context) */}
-        {user.role === "SuperAdmin" && (
-          <div className="pt-8 pb-4 px-4 space-y-4">
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest px-2 mb-2">Live System Stats</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <Database className="w-3.5 h-3.5 text-purple-400 mb-1" />
-                <p className="text-xs font-bold">4</p>
-                <p className="text-[9px] text-white/40">Nodes</p>
-              </div>
-              <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <Activity className="w-3.5 h-3.5 text-emerald-400 mb-1" />
-                <p className="text-xs font-bold">142</p>
-                <p className="text-[9px] text-white/40">Active</p>
-              </div>
-              <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <UserX className="w-3.5 h-3.5 text-red-400 mb-1" />
-                <p className="text-xs font-bold">12</p>
-                <p className="text-[9px] text-white/40">Suspended</p>
-              </div>
-              <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <ScrollText className="w-3.5 h-3.5 text-blue-400 mb-1" />
-                <p className="text-xs font-bold">2.4k</p>
-                <p className="text-[9px] text-white/40">Logs</p>
+        {user.role === "SuperAdmin" && (() => {
+          const nodesCount = isLoadingUsers ? 4 : allUsers.filter(u => u.role === 'LRO' || u.role === 'Notary').length;
+          const activeCount = isLoadingUsers ? 142 : allUsers.filter(u => u.status === 'active').length;
+          const suspendedCount = isLoadingUsers ? 12 : allUsers.filter(u => u.status === 'suspended').length;
+          const logsCount = isLoadingLogs 
+            ? '2.4k'
+            : (activityLogs.length > 999 ? (activityLogs.length / 1000).toFixed(1) + 'k' : activityLogs.length);
+
+          return (
+            <div className="pt-8 pb-4 px-4 space-y-4">
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest px-2 mb-2 flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                Live System Stats
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <Database className="w-3.5 h-3.5 text-purple-400 mb-1" />
+                  <p className="text-xs font-bold">{nodesCount}</p>
+                  <p className="text-[9px] text-white/40">Nodes</p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400 mb-1" />
+                  <p className="text-xs font-bold">{activeCount}</p>
+                  <p className="text-[9px] text-white/40">Active</p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <UserX className="w-3.5 h-3.5 text-red-400 mb-1" />
+                  <p className="text-xs font-bold">{suspendedCount}</p>
+                  <p className="text-[9px] text-white/40">Suspended</p>
+                </div>
+                <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <ScrollText className="w-3.5 h-3.5 text-blue-400 mb-1" />
+                  <p className="text-xs font-bold">{logsCount}</p>
+                  <p className="text-[9px] text-white/40">Logs</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </nav>
 
       {/* Logout */}

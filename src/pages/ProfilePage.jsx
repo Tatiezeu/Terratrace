@@ -23,6 +23,7 @@ import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
 import { useProfile, useUpdateProfile } from "../hooks/useProfile";
+import { logActivity } from "../utils/logger";
 
 export default function ProfilePage() {
   const { updateUser } = useAuth();
@@ -71,6 +72,8 @@ export default function ProfilePage() {
     }
   }, [serverUser]);
 
+  const [passLoading, setPassLoading] = useState(false);
+
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -96,6 +99,7 @@ export default function ProfilePage() {
 
         if (result) {
           toast.success("Profile picture updated and saved successfully!", { id: toastId });
+          logActivity('Update', 'User updated profile avatar image');
           // Dispatch custom event to notify AppLayout / TopNav to fetch user data immediately
           window.dispatchEvent(new CustomEvent('auth-update'));
         }
@@ -120,6 +124,7 @@ export default function ProfilePage() {
 
       if (result) {
         toast.success("Profile information updated successfully!");
+        logActivity('Update', 'User updated profile information');
         // Dispatch custom event to sync navbar/sidebar immediately
         window.dispatchEvent(new CustomEvent('auth-update'));
       }
@@ -133,7 +138,7 @@ export default function ProfilePage() {
       return toast.error("Passwords do not match");
     }
 
-    setLoading(true);
+    setPassLoading(true);
     try {
       const response = await api.patch('/users/update-password', {
         currentPassword: passwords.currentPassword,
@@ -142,6 +147,7 @@ export default function ProfilePage() {
 
       if (response.data.success) {
         toast.success("Password updated successfully!");
+        logActivity('Update', 'User updated account password');
         setPasswords({ currentPassword: "", newPassword: "", confirmNewPassword: "" });
       }
     } catch (err) {
@@ -149,7 +155,7 @@ export default function ProfilePage() {
         description: err.response?.data?.message || "Invalid current password."
       });
     } finally {
-      setLoading(false);
+      setPassLoading(false);
     }
   };
 
@@ -357,10 +363,10 @@ export default function ProfilePage() {
               <div className="flex justify-end">
                 <Button 
                   onClick={handleUpdatePassword}
-                  disabled={loading}
+                  disabled={passLoading}
                   className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-6 h-10 rounded-xl"
                 >
-                  {loading ? "Updating..." : "Update Password"}
+                  {passLoading ? "Updating..." : "Update Password"}
                 </Button>
               </div>
             </div>

@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import { Badge } from "../ui/badge";
 import api from "../../../utils/api";
+import { logActivity } from "../../../utils/logger";
 
 const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpeg,.png", multiple = false }) => {
   const fileArray = Array.isArray(files) ? files : (files ? [files] : []);
@@ -78,7 +79,7 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
                   }}
                   className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
@@ -167,6 +168,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
       if (response.data.success) {
         setStep(isDirectGrant ? 2 : 4);
         toast.success(isDirectGrant ? "Application submitted!" : "Transfer request submitted!");
+        logActivity('Create', `User initiated ${isDirectGrant ? 'direct grant application' : 'transfer request'} for Plot '${plot.landCode}'`);
       }
     } catch (err) {
       toast.error("Submission failed", {

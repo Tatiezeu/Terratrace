@@ -52,6 +52,8 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../app/components/ui/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNotifications, useSentNotifications, useRecipients } from "../hooks/useNotificationsData";
 
 export default function NotificationsPage() {
   const { user: currentUser } = useAuth();
@@ -62,40 +64,21 @@ export default function NotificationsPage() {
   const [replyText, setReplyText] = useState("");
   const [targetMsg, setTargetMsg] = useState(null);
   const [attachments, setAttachments] = useState([]);
+  const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const fileInputRef = useRef(null);
   const replyFileInputRef = useRef(null);
   
-  const [notifications, setNotifications] = useState([]);
-  const [sentNotifications, setSentNotifications] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // ─── Server state via TanStack Query ─────────────────────────────────────────
+  const { data: notifications = [] } = useNotifications();
+  const { data: sentNotifications = [] } = useSentNotifications();
+  const { data: users = [] } = useRecipients();
 
   const [recipientRole, setRecipientRole] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState("");
   const [newMsgSubject, setNewMsgSubject] = useState("");
   const [newMsgBody, setNewMsgBody] = useState("");
-
-  const fetchAll = async () => {
-    try {
-      setLoading(true);
-      const [notifRes, sentRes, userRes] = await Promise.all([
-        api.get('/notifications'),
-        api.get('/notifications/sent'),
-        api.get('/users/recipients')
-      ]);
-      if (notifRes.data.success) setNotifications(notifRes.data.data);
-      if (sentRes.data.success) setSentNotifications(sentRes.data.data);
-      if (userRes.data.success) setUsers(userRes.data.data);
-    } catch (err) {
-      toast.error("Failed to fetch data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAll();
-  }, []);
 
   const displayList = useMemo(() => {
     if (activeTab === "sent") return sentNotifications;
@@ -132,17 +115,23 @@ export default function NotificationsPage() {
         await api.delete(`/notifications/${id}`);
         toast.success("Notification deleted");
       }
-      fetchAll();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'sent'] });
     } catch (err) {
       toast.error("Action failed");
     }
   };
 
-  const clearAll = async () => {
+  const handleClearAll = () => {
+    setClearAllConfirmOpen(true);
+  };
+
+  const executeClearAll = async () => {
     try {
       await api.delete('/notifications');
       toast.success("All notifications cleared");
-      setNotifications([]);
+      setClearAllConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to clear notifications");
     }
@@ -206,7 +195,8 @@ export default function NotificationsPage() {
       setIsReplyOpen(false);
       setReplyText("");
       setAttachments([]);
-      fetchAll();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'sent'] });
     } catch (err) {
       toast.error("Failed to send reply");
     }
@@ -236,7 +226,8 @@ export default function NotificationsPage() {
       setNewMsgBody("");
       setSelectedRecipientId("");
       setAttachments([]);
-      fetchAll();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'sent'] });
     } catch (err) {
       toast.error("Failed to send message");
     }
@@ -267,7 +258,7 @@ export default function NotificationsPage() {
         
         <div className="flex gap-3">
           {activeTab !== 'sent' && (
-            <Button variant="outline" onClick={clearAll} className="gap-2 rounded-xl h-11 px-5 border-red-200 text-red-600 hover:bg-red-50">
+            <Button variant="outline" onClick={handleClearAll} className="gap-2 rounded-xl h-11 px-5 border-red-200 text-red-600 hover:bg-red-50">
               <Trash2 className="w-4 h-4" /> Clear Inbox
             </Button>
           )}
@@ -547,6 +538,33 @@ export default function NotificationsPage() {
           <DialogFooter className="border-t pt-4">
             <Button variant="ghost" onClick={() => { setIsReplyOpen(false); setAttachments([]); }}>Cancel</Button>
             <Button onClick={sendReply} className="bg-[var(--terra-navy)] text-white gap-2 h-11 px-8 rounded-xl">Send Reply <ArrowRight className="w-4 h-4" /></Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR ALL NOTIFICATIONS CONFIRMATION DIALOG */}
+      <Dialog open={clearAllConfirmOpen} onOpenChange={setClearAllConfirmOpen}>
+        <DialogContent className="max-w-md bg-white rounded-2xl border-none shadow-2xl p-0 overflow-hidden dark:bg-slate-900">
+          <div className="bg-red-500 p-6 flex flex-col items-center text-white text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Communications</DialogTitle>
+            <DialogDescription className="text-white/80 mt-1">This will permanently clear your inbox.</DialogDescription>
+          </div>
+          <div className="p-8">
+            <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
+              Are you sure you want to permanently clear ALL notifications?
+            </p>
+            <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
+              This action is permanent and cannot be undone. All messages, official alerts, and archived items will be cleared.
+            </p>
+          </div>
+          <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">
+            <Button variant="ghost" onClick={() => setClearAllConfirmOpen(false)} className="flex-1 rounded-xl h-11">No, Keep Messages</Button>
+            <Button onClick={executeClearAll} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
+              Yes, Clear All
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

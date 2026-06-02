@@ -1,38 +1,46 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
+import { useAuthStore } from "../store/authStore";
 import api from "../utils/api";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { user, token, setAuth, clearAuth, updateUser } = useAuthStore();
 
     const fetchUser = async () => {
         try {
-            const response = await api.get('/users/me');
-            if (response.data.success) {
-                setUser(response.data.data);
+            if (token) {
+                const response = await api.get('/users/me');
+                if (response.data.success) {
+                    setAuth(token, response.data.data);
+                }
             }
         } catch (err) {
-            console.error("Auth initialization failed:", err);
-            setUser(null);
-        } finally {
-            setLoading(false);
+            console.error("Auth sync failed:", err);
+            if (err.response?.status === 401) {
+                clearAuth();
+            }
         }
     };
 
     useEffect(() => {
-        fetchUser();
+        if (token) {
+            fetchUser();
+        }
         window.addEventListener('auth-update', fetchUser);
         return () => window.removeEventListener('auth-update', fetchUser);
-    }, []);
-
-    const updateUser = (userData) => {
-        setUser(prev => ({ ...prev, ...userData }));
-    };
+    }, [token]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, setUser, refreshUser: fetchUser, updateUser }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            token,
+            loading: false, // Instant dashboard experience, no loading screens!
+            setUser: (u) => setAuth(token, u), 
+            refreshUser: fetchUser, 
+            updateUser,
+            clearAuth,
+        }}>
             {children}
         </AuthContext.Provider>
     );

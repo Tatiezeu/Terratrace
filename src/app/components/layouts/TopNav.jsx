@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Bell, Check, Trash2, Reply, Wifi } from "lucide-react";
+import { Moon, Sun, Bell, Check, Trash2, Reply, Wifi, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Badge } from "../ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
@@ -13,30 +13,17 @@ import {
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import api from "../../../utils/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNotifications } from "../../../hooks/useNotificationsData";
 
-export function TopNav({ user, onRoleChange }) {
+export function TopNav({ user, onRoleChange, onLogout }) {
   const [time, setTime] = useState(new Date());
   const { theme, setTheme } = useTheme();
-  const [notifications, setNotifications] = useState([]);
+  const queryClient = useQueryClient();
 
+  // ─── Notifications via TanStack Query (auto-refresh every 30s via staleTime) ───
+  const { data: notifications = [] } = useNotifications();
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
-
-  const fetchNotifications = async () => {
-    try {
-      const response = await api.get('/notifications');
-      if (response.data.success) {
-        setNotifications(response.data.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // Poll every 30s
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -53,7 +40,7 @@ export function TopNav({ user, onRoleChange }) {
           .map(n => api.patch(`/notifications/${n._id}/status`, { status: 'read' }))
       );
       toast.success("All notifications marked as read");
-      fetchNotifications();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to mark as read");
     }
@@ -63,7 +50,7 @@ export function TopNav({ user, onRoleChange }) {
     try {
       await api.delete('/notifications');
       toast.success("Cleared all notifications");
-      setNotifications([]);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to clear notifications");
     }
@@ -78,7 +65,7 @@ export function TopNav({ user, onRoleChange }) {
         await api.delete(`/notifications/${id}`);
         toast.success("Notification removed");
       }
-      fetchNotifications();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error(`Failed to ${action} notification`);
     }
@@ -197,7 +184,7 @@ export function TopNav({ user, onRoleChange }) {
           )}
         </button>
 
-        {/* User Profile */}
+        {/* User Profile + Logout */}
         <div className="flex items-center gap-3 pl-4 border-l border-border">
           <Avatar className="w-10 h-10 ring-2 ring-[var(--terra-emerald)] ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatar} alt={user.name} />
@@ -213,6 +200,15 @@ export function TopNav({ user, onRoleChange }) {
               {user.role}
             </span>
           </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title="Logout"
+              className="ml-2 p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </motion.header>

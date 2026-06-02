@@ -26,6 +26,8 @@ import { motion, AnimatePresence } from "motion/react";
 import api from "../utils/api";
 import { useEffect } from "react";
 import { useServerQuery, useServerState } from "../context/ServerStateContext";
+import { useQuery } from "@tanstack/react-query";
+import { logActivity } from "../utils/logger";
 
 export default function SettingsPage() {
   const [loginAttempts, setLoginAttempts] = useState("5");
@@ -46,6 +48,45 @@ export default function SettingsPage() {
   });
   const [recaptchaMode, setRecaptchaMode] = useState("hybrid");
   const [recaptchaAttempts, setRecaptchaAttempts] = useState(3);
+
+  const [logFilter, setLogFilter] = useState("All");
+  const [clearLogsConfirmOpen, setClearLogsConfirmOpen] = useState(false);
+
+  const { data: activityLogs = [], refetch: refetchLogs } = useQuery({
+    queryKey: ['activity-logs'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/logs');
+        if (response.data && response.data.success) {
+          const serverLogs = response.data.data;
+          const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+          const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
+          const allLogs = [...serverLogs, ...localLogs];
+          const uniqueLogs = Array.from(new Map(allLogs.map(item => [item.id || item._id, item])).values());
+          uniqueLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          localStorage.setItem('terratrace_activity_logs', JSON.stringify(uniqueLogs));
+          return uniqueLogs;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch logs from backend, falling back to localStorage:", err);
+      }
+      const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+      const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
+      localLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return localLogs;
+    },
+    staleTime: 5 * 1000,
+  });
+
+  useEffect(() => {
+    const handleNewLog = () => {
+      refetchLogs();
+    };
+    window.addEventListener('new-activity-log', handleNewLog);
+    return () => {
+      window.removeEventListener('new-activity-log', handleNewLog);
+    };
+  }, [refetchLogs]);
 
   const { data: serverUsers } = useServerQuery('settings_users', async () => {
     const response = await api.get('/users');
@@ -96,6 +137,7 @@ export default function SettingsPage() {
         const response = await api.patch('/config', { configs });
         if (response.data.success) {
             toast.success("Settings updated successfully");
+            logActivity('Update', 'Admin updated global system settings');
             invalidateQuery('settings_config');
         }
     } catch (err) {
@@ -157,12 +199,20 @@ export default function SettingsPage() {
       const response = await api.delete(`/users/${deleteConfirm.id}`);
       if (response.data.success) {
         toast.success("Account deleted successfully");
+        logActivity('Delete', `Admin deleted user account: ${deleteConfirm.name} (${deleteConfirm.email})`);
         setDeleteConfirm(null);
         invalidateQuery('settings_users');
       }
     } catch (err) {
       toast.error("Deletion failed");
     }
+  };
+
+  const handleClearLogs = () => {
+    localStorage.removeItem('terratrace_activity_logs');
+    toast.success("Activity logs successfully cleared from local secure cache!");
+    setClearLogsConfirmOpen(false);
+    refetchLogs();
   };
 
   const toggleTFA = async (id) => {
@@ -483,42 +533,95 @@ export default function SettingsPage() {
         {/* Login Activity */}
         <TabsContent value="activity">
           <Card className="border-none shadow-sm bg-white/50 dark:bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden">
-            <CardHeader>
-              <CardTitle className="font-['Syne']">Access Log</CardTitle>
-              <CardDescription>Detailed history of all system access events and sessions.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 bg-white/30 p-6 flex-wrap gap-4">
+              <div>
+                <CardTitle className="font-['Syne'] text-xl flex items-center gap-2 text-[#002147] dark:text-white">
+                  <Activity className="w-5 h-5 text-[var(--terra-emerald)]" />
+                  Security & Access Audit Trail
+                </CardTitle>
+                <CardDescription>Comprehensive, immutable visual timeline of node activity and security events.</CardDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setClearLogsConfirmOpen(true)}
+                className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-950/20 text-xs font-bold gap-2 h-10 px-4"
+              >
+                <Trash2 className="w-4 h-4" /> Clear Cache Logs
+              </Button>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted/50 border-b border-border">
-                      <th className="px-5 py-4 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-widest">User</th>
-                      <th className="px-5 py-4 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Role</th>
-                      <th className="px-5 py-4 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Action</th>
-                      <th className="px-5 py-4 text-left text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Time</th>
-                      <th className="px-5 py-4 text-right text-[10px] font-bold text-muted-foreground uppercase tracking-widest">IP Address</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {mockActivityLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-white/40 transition-colors">
-                        <td className="px-5 py-3 font-bold text-sm text-[#002147]">{log.user}</td>
-                        <td className="px-5 py-3 text-[10px] text-muted-foreground font-black uppercase tracking-tighter">{log.role}</td>
-                        <td className="px-5 py-3">
-                          <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded-lg ${
-                            log.status === "failed"  ? "bg-red-50 text-red-600"    :
-                            log.status === "warning" ? "bg-amber-50 text-amber-600" :
-                            "bg-emerald-50 text-emerald-600"
-                          }`}>
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-xs font-mono text-muted-foreground">{log.time}</td>
-                        <td className="px-5 py-3 text-right text-xs font-mono text-[#002147] font-bold">{log.ip}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <CardContent className="p-6 space-y-6">
+              {/* Filter Pills */}
+              <div className="flex flex-wrap gap-2 pb-2">
+                {['All', 'Auth', 'Create', 'Update', 'Delete', 'Read'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setLogFilter(cat)}
+                    className={`text-xs px-4 py-2 rounded-full font-bold transition-all border ${
+                      logFilter === cat
+                        ? "bg-[var(--terra-navy)] text-white border-[var(--terra-navy)] dark:bg-[var(--terra-emerald)]"
+                        : "border-border bg-card hover:border-[var(--terra-navy)] dark:text-gray-300 dark:hover:border-[var(--terra-emerald)]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Vertical Timeline */}
+              <div className="relative pl-6 border-l-2 border-border/80 space-y-6">
+                {(logFilter === 'All' ? activityLogs : activityLogs.filter(log => log.action_type === logFilter)).length > 0 ? (
+                  (logFilter === 'All' ? activityLogs : activityLogs.filter(log => log.action_type === logFilter)).map((log) => {
+                    let dotColor = "bg-emerald-500 ring-emerald-500/20";
+                    if (log.success === false) dotColor = "bg-red-500 ring-red-500/20";
+                    else if (log.action_type === 'Delete') dotColor = "bg-red-400 ring-red-400/20";
+                    else if (log.action_type === 'Update') dotColor = "bg-amber-400 ring-amber-400/20";
+                    else if (log.action_type === 'Create') dotColor = "bg-blue-500 ring-blue-500/20";
+                    else if (log.action_type === 'Auth') dotColor = "bg-purple-500 ring-purple-500/20";
+                    
+                    return (
+                      <div key={log.id || log._id} className="relative group animate-in fade-in slide-in-from-left-2">
+                        {/* Timeline Node Icon */}
+                        <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full ring-4 ${dotColor}`} />
+                        
+                        <div className="bg-white/80 dark:bg-white/5 border border-border p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg ${
+                                  log.action_type === 'Auth' ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                                  log.action_type === 'Create' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                                  log.action_type === 'Update' ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                                  log.action_type === 'Delete' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                                  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                }`}>
+                                  {log.action_type}
+                                </span>
+                                <h4 className="text-sm font-black text-[#002147] dark:text-white leading-tight">
+                                  {log.description}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{log.userName || log.user || 'Anonymous'}</span>
+                                <span>·</span>
+                                <span className="uppercase font-black text-[9px]">{log.userRole || log.role || 'Guest'}</span>
+                                <span>·</span>
+                                <span className="font-mono text-[10px]">{log.ip || '127.0.0.1'}</span>
+                              </p>
+                            </div>
+                            <span className="text-[10px] font-mono text-muted-foreground md:text-right shrink-0">
+                              {new Date(log.timestamp || log.time).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Activity className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p className="font-medium text-sm">No activity logs recorded under this category.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -769,6 +872,33 @@ export default function SettingsPage() {
             <Button variant="outline" onClick={() => setEditAccount(null)} className="rounded-xl h-11">Cancel</Button>
             <Button onClick={handleEditSave} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white rounded-xl h-11 px-8">
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR LOGS CONFIRMATION DIALOG */}
+      <Dialog open={clearLogsConfirmOpen} onOpenChange={setClearLogsConfirmOpen}>
+        <DialogContent className="max-w-md bg-white rounded-2xl border-none shadow-2xl p-0 overflow-hidden dark:bg-slate-900">
+          <div className="bg-red-500 p-6 flex flex-col items-center text-white text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Activity Audit</DialogTitle>
+            <DialogDescription className="text-white/80 mt-1">This will permanently clear your local cache logs.</DialogDescription>
+          </div>
+          <div className="p-8">
+            <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
+              Are you sure you want to clear all frontend-cached activity logs?
+            </p>
+            <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
+              Only frontend-cached activity logs in this browser will be wiped. Real-time secure logs stored in the backend server nodes will remain untouched.
+            </p>
+          </div>
+          <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">
+            <Button variant="ghost" onClick={() => setClearLogsConfirmOpen(false)} className="flex-1 rounded-xl h-11">No, Keep Logs</Button>
+            <Button onClick={handleClearLogs} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
+              Yes, Clear Cache
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -24,8 +24,9 @@ import { Label } from "../app/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../app/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "../app/components/ui/avatar";
 import { toast } from "sonner";
-import { executeRecaptcha, loadRecaptchaScript, isRecaptchaConfigured } from "../utils/recaptchaLoader";
 import { useEffect } from "react";
+import VisualCaptchaChallenge from "../app/components/shared/VisualCaptchaChallenge";
+import { Dialog, DialogContent } from "../app/components/ui/dialog";
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
@@ -34,17 +35,14 @@ export default function RegistrationPage() {
   const [showPass, setShowPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
-  const [isCaptchaRequired, setIsCaptchaRequired] = useState(() => {
+  const [isCaptchaRequired] = useState(() => {
     return localStorage.getItem('recaptcha_enabled') !== 'false';
   });
 
-  // Pre-load Google reCAPTCHA v3 script immediately when page mounts
-  // Only if a real site key is configured (not test keys)
-  useEffect(() => {
-    if (isCaptchaRequired && isRecaptchaConfigured()) {
-      loadRecaptchaScript(import.meta.env.VITE_RECAPTCHA_SITE_KEY);
-    }
-  }, [isCaptchaRequired]);
+  // Custom reCAPTCHA v2 States
+  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+  const [showCaptchaModal, setShowCaptchaModal] = useState(false);
+  const [captchaSolving, setCaptchaSolving] = useState(false);
   
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -105,24 +103,19 @@ export default function RegistrationPage() {
       return;
     }
 
-    setLoading(true);
-    
-    let token = null;
-    if (isCaptchaRequired) {
-      try {
-        token = await executeRecaptcha('signup');
-      } catch (err) {
-        console.warn("reCAPTCHA programmatic execution failed, executing fail-safe pass.", err);
-      }
+    if (isCaptchaRequired && !isCaptchaVerified) {
+      toast.error("Please solve the 'I'm not a robot' visual challenge.");
+      return;
     }
+
+    setLoading(true);
     
     try {
       const response = await api.post('/auth/signup', {
         ...formData,
         password,
         profilePic,
-        role: "Client", // Default role
-        recaptchaToken: token
+        role: "Client" // Default role
       });
 
       if (response.data.success) {
@@ -367,38 +360,51 @@ export default function RegistrationPage() {
               </div>
             </div>
 
-            {/* reCAPTCHA v3 shield badge — visible when active */}
-            {isCaptchaRequired && isRecaptchaConfigured() && (
-              <div className="flex items-center gap-2.5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30">
-                  <ShieldCheck className="w-4 h-4 text-white" />
+            {/* Custom Google-like reCAPTCHA v2 Checkbox widget */}
+            {isCaptchaRequired && (
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-gray-50/50 shadow-inner max-w-sm mx-auto my-6 select-none font-['Montserrat']">
+                <div className="flex items-center gap-3">
+                  <div 
+                    onClick={() => {
+                      if (!isCaptchaVerified && !captchaSolving) {
+                        setCaptchaSolving(true);
+                        setShowCaptchaModal(true);
+                      }
+                    }}
+                    className={`w-7 h-7 rounded-md border-2 flex items-center justify-center cursor-pointer transition-all duration-200 ${
+                      isCaptchaVerified 
+                        ? "bg-emerald-500 border-emerald-600 shadow-md shadow-emerald-500/20" 
+                        : "bg-white border-gray-300 hover:border-emerald-500"
+                    }`}
+                  >
+                    {captchaSolving ? (
+                      <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    ) : isCaptchaVerified ? (
+                      <CheckCircle2 className="w-5 h-5 text-white" />
+                    ) : null}
+                  </div>
+                  <span className="text-xs font-bold text-gray-700 tracking-tight">I'm not a robot</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold text-emerald-800 leading-none">Protected by reCAPTCHA v3</p>
-                  <p className="text-[10px] text-emerald-700/70 mt-0.5 leading-snug">
-                    Behavioral risk scoring active ·{" "}
-                    <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="underline hover:text-emerald-900">Privacy</a>
-                    {" & "}
-                    <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="underline hover:text-emerald-900">Terms</a>
-                  </p>
+                
+                <div className="flex flex-col items-center shrink-0">
+                  <div className="flex items-center gap-1">
+                    <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                    <span className="text-[9px] font-black text-gray-500 tracking-tighter">reCAPTCHA v2</span>
+                  </div>
+                  <div className="flex gap-1.5 text-[8px] text-gray-400 mt-1 font-semibold">
+                    <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer" className="hover:underline">Privacy</a>
+                    <span>·</span>
+                    <a href="https://policies.google.com/terms" target="_blank" rel="noreferrer" className="hover:underline">Terms</a>
+                  </div>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              </div>
-            )}
-            {isCaptchaRequired && !isRecaptchaConfigured() && (
-              <div className="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl">
-                <div className="w-8 h-8 rounded-xl bg-amber-400 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-white" />
-                </div>
-                <p className="text-[11px] text-amber-800 font-medium">reCAPTCHA enabled but site key not configured</p>
               </div>
             )}
 
             <div className="pt-6">
               <Button 
                 type="submit" 
-                disabled={loading} 
-                className="w-full h-14 bg-[#002147] hover:bg-blue-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/10 transition-all flex items-center justify-center gap-3"
+                disabled={loading || (isCaptchaRequired && !isCaptchaVerified)} 
+                className="w-full h-14 bg-[#002147] hover:bg-blue-900 text-white rounded-2xl font-bold text-lg shadow-xl shadow-blue-900/10 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -421,6 +427,31 @@ export default function RegistrationPage() {
       <p className="text-sm font-medium text-gray-500">
         Already have an account? <Link to="/login" className="text-emerald-600 font-bold hover:underline">Sign In</Link>
       </p>
+
+      {/* Dialog modal for custom visual challenge grid */}
+      <Dialog open={showCaptchaModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowCaptchaModal(false);
+          setCaptchaSolving(false);
+        }
+      }}>
+        <DialogContent className="max-w-[400px] p-0 border-none bg-transparent shadow-none flex justify-center">
+          <VisualCaptchaChallenge 
+            onSuccess={() => {
+              setIsCaptchaVerified(true);
+              setShowCaptchaModal(false);
+              setCaptchaSolving(false);
+              toast.success("Identity Verified", {
+                description: "reCAPTCHA visual challenge solved successfully."
+              });
+            }}
+            onCancel={() => {
+              setShowCaptchaModal(false);
+              setCaptchaSolving(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

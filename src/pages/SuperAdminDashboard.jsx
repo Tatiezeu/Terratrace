@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ShieldAlert, Users, UserPlus, Activity, Database, Search,
   ArrowUpRight, ChevronRight, Building, Gavel, X, Clock,
@@ -11,55 +11,72 @@ import { Input } from "../app/components/ui/input";
 import { RegisterOfficerModal } from "../app/components/admin/RegisterOfficerModal";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { useEffect } from "react";
 import api from "../utils/api";
 import { cn } from "../app/components/ui/utils";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from "../app/components/ui/dialog";
 import { mockActivityLogs } from "../data/mockData";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useAllUsers } from "../hooks/useAdminData";
+import { useLandPlots } from "../hooks/useLandData";
+import { useNotifications } from "../hooks/useNotificationsData";
 
 export default function SuperAdminDashboard() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [officerType, setOfficerType] = useState("lro");
   const [officerSearch, setOfficerSearch] = useState("");
   const [showAllLogs, setShowAllLogs] = useState(false);
-  const [officers, setOfficers] = useState([]);
-  const [statePlots, setStatePlots] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [officersRes, plotsRes, notifRes] = await Promise.all([
-        api.get('/users'),
-        api.get('/land'),
-        api.get('/notifications')
-      ]);
+  const queryClient = useQueryClient();
 
-      if (officersRes.data.success) {
-        const filtered = officersRes.data.data.filter(u => u.role === "LRO" || u.role === "Notary");
-        setOfficers(filtered);
+  // ─── Server state via TanStack Query ─────────────────────────────────────────
+  const { data: allUsers = [], refetch: refetchUsers } = useAllUsers();
+  const { data: allPlots = [] } = useLandPlots();
+  const { data: notifications = [] } = useNotifications();
+
+  const { data: activityLogs = [], refetch: refetchLogs } = useQuery({
+    queryKey: ['activity-logs'],
+    queryFn: async () => {
+      try {
+        const response = await api.get('/logs');
+        if (response.data && response.data.success) {
+          const serverLogs = response.data.data;
+          const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+          const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
+          const allLogs = [...serverLogs, ...localLogs];
+          const uniqueLogs = Array.from(new Map(allLogs.map(item => [item.id || item._id, item])).values());
+          uniqueLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          return uniqueLogs;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch logs from backend, falling back to localStorage:", err);
       }
+      const localLogsJson = localStorage.getItem('terratrace_activity_logs');
+      const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
+      localLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return localLogs;
+    },
+    staleTime: 5 * 1000,
+  });
 
-      if (plotsRes.data.success) {
-        const stateOwned = plotsRes.data.data.filter(p => p.landType === "00050");
-        setStatePlots(stateOwned);
-      }
-
-      if (notifRes.data.success) {
-        setNotifications(notifRes.data.data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Reactive listener for log updates
   useEffect(() => {
-    fetchData();
-    window.refreshOfficerList = fetchData;
-    return () => delete window.refreshOfficerList;
-  }, []);
+    const handleNewLog = () => {
+      refetchLogs();
+    };
+    window.addEventListener('new-activity-log', handleNewLog);
+    return () => window.removeEventListener('new-activity-log', handleNewLog);
+  }, [refetchLogs]);
+
+  // ─── Derive filtered views from cached data ───────────────────────────────
+  const officers = useMemo(() => allUsers.filter(u => u.role === "LRO" || u.role === "Notary"), [allUsers]);
+  const statePlots = useMemo(() => allPlots.filter(p => p.landType === "00050"), [allPlots]);
 
   const lroCount    = officers.filter(o => o.role === "LRO").length;
   const notaryCount = officers.filter(o => o.role === "Notary").length;
@@ -97,19 +114,24 @@ export default function SuperAdminDashboard() {
       } else if (action === 'delete') {
         await api.delete(`/notifications/${id}`);
       }
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to update notification");
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--terra-emerald)]"></div>
-      </div>
-    );
-  }
+  const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
+
+  const executeClearAllNotif = async () => {
+    try {
+      await api.delete('/notifications');
+      toast.success("All system notifications cleared successfully");
+      setClearAllConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } catch (err) {
+      toast.error("Failed to clear notifications");
+    }
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -265,16 +287,27 @@ export default function SuperAdminDashboard() {
         <div className="space-y-6">
           <Card className="border-emerald-100 shadow-emerald-500/5 dark:border-emerald-900/40">
             <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
                   <ShieldAlert className="w-5 h-5 text-emerald-600" />
                   System Notifications
                 </CardTitle>
-                {notifications.filter(n => n.status === 'unread').length > 0 && (
-                  <Badge className="bg-red-500 text-white animate-pulse">
-                    {notifications.filter(n => n.status === 'unread').length} New
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {notifications.filter(n => n.status === 'unread').length > 0 && (
+                    <Badge className="bg-red-500 text-white animate-pulse">
+                      {notifications.filter(n => n.status === 'unread').length} New
+                    </Badge>
+                  )}
+                  {notifications.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setClearAllConfirmOpen(true)}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 text-[10px] uppercase tracking-wider font-bold h-7 px-2.5 rounded-lg"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -332,16 +365,24 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4)).map((log) => (
-                  <div key={log.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
-                    <div className={`w-1 rounded-full shrink-0 h-12 ${log.status === "success" ? "bg-emerald-500" : log.status === "failed" ? "bg-red-400" : "bg-amber-400"}`} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold truncate">{log.action}</p>
-                      <p className="text-[10px] text-muted-foreground">{log.user} · {log.role}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{log.ip} · {log.time.split(" ")[1]}</p>
+                {(activityLogs.length > 0 ? (showAllLogs ? activityLogs : activityLogs.slice(0, 8)) : (showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4))).map((log) => {
+                  const logTime = log.timestamp 
+                    ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                    : (log.time?.split(" ")[1] || "");
+                  return (
+                    <div key={log.id || log._id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
+                      <div className={cn(
+                        "w-1 rounded-full shrink-0 h-12",
+                        log.success || log.status === "success" ? "bg-emerald-500" : "bg-red-400"
+                      )} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold truncate text-foreground">{log.description || log.action}</p>
+                        <p className="text-[10px] text-muted-foreground">{log.userName || log.user} · {log.userRole || log.role}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono">{log.ip} · {logTime}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <Button 
                   variant="outline" 
                   className="w-full text-xs font-bold uppercase tracking-widest gap-2"
@@ -357,9 +398,39 @@ export default function SuperAdminDashboard() {
 
       <RegisterOfficerModal
         open={isRegisterOpen}
-        onClose={() => setIsRegisterOpen(false)}
+        onClose={() => {
+          setIsRegisterOpen(false);
+          refetchUsers();
+        }}
         officerType={officerType}
       />
+
+      {/* CLEAR ALL NOTIFICATIONS CONFIRMATION DIALOG */}
+      <Dialog open={clearAllConfirmOpen} onOpenChange={setClearAllConfirmOpen}>
+        <DialogContent className="max-w-md bg-white rounded-2xl border-none shadow-2xl p-0 overflow-hidden dark:bg-slate-900">
+          <div className="bg-red-500 p-6 flex flex-col items-center text-white text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
+              <Trash2 className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Alerts Registry</DialogTitle>
+            <DialogDescription className="text-white/80 mt-1">This will permanently clear all system alerts.</DialogDescription>
+          </div>
+          <div className="p-8">
+            <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
+              Are you sure you want to permanently clear ALL system alerts?
+            </p>
+            <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
+              This action is permanent and cannot be undone. All system notifications and alerts will be permanently deleted from the database.
+            </p>
+          </div>
+          <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">
+            <Button variant="ghost" onClick={() => setClearAllConfirmOpen(false)} className="flex-1 rounded-xl h-11">No, Keep Alerts</Button>
+            <Button onClick={executeClearAllNotif} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
+              Yes, Clear All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

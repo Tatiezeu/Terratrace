@@ -139,16 +139,7 @@ export default function NotificationsPage() {
 
   const handleDownload = async (path) => {
     try {
-      const fileName = path.split('/').pop();
-      const response = await fetch(`http://localhost:5001${path}`);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
+      window.open(`http://localhost:5001${path}`, '_blank');
     } catch (err) {
       toast.error("Download failed");
     }

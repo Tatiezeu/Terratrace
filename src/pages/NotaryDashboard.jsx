@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Gavel, 
   FileText, 
@@ -66,6 +66,17 @@ export default function NotaryDashboard() {
   const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
   const [isPaymentReceivedModalOpen, setIsPaymentReceivedModalOpen] = useState(false);
+
+  // ─── Frontend-only Clear States ──────────────────────────────────────────────
+  const [clearedCaseIds, setClearedCaseIds] = useState([]);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      const saved = localStorage.getItem(`cleared_notary_cases_${currentUser._id || currentUser.id}`);
+      setClearedCaseIds(saved ? JSON.parse(saved) : []);
+    }
+  }, [currentUser]);
   
   // Form States
   const [feeAmount, setFeeAmount] = useState("");
@@ -127,6 +138,25 @@ export default function NotaryDashboard() {
 
   const pendingQueue = filteredRequests.filter(r => r.status === 'Initiated');
   const ongoingCases = filteredRequests.filter(r => ['Under_Verification', 'Awaiting_Fee_Payment', 'Payment_Submitted', 'Payment_Verified'].includes(r.status));
+
+  const treatedCases = useMemo(() => {
+    return filteredRequests.filter(r => ['Forwarded_to_LRO', 'Public_Notice', 'Completed', 'Rejected', 'Cancelled'].includes(r.status));
+  }, [filteredRequests]);
+
+  const visibleTreatedCases = useMemo(() => {
+    return treatedCases.filter(r => !clearedCaseIds.includes(r._id));
+  }, [treatedCases, clearedCaseIds]);
+
+  const handleClearAllTreated = () => {
+    const idsToClear = visibleTreatedCases.map(c => c._id);
+    const updated = [...new Set([...clearedCaseIds, ...idsToClear])];
+    setClearedCaseIds(updated);
+    if (currentUser) {
+      localStorage.setItem(`cleared_notary_cases_${currentUser._id || currentUser.id}`, JSON.stringify(updated));
+    }
+    setIsClearConfirmOpen(false);
+    toast.success("Treated cases cleared from view!");
+  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -229,6 +259,64 @@ export default function NotaryDashboard() {
                </div>
             </CardContent>
           </Card>
+
+          {/* Treated Cases (Archive Queue) */}
+          <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10 mt-6">
+            <CardHeader className="border-b bg-muted/30 dark:bg-slate-800/50 dark:border-white/10 py-4 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> All Treated Cases
+                </CardTitle>
+                <CardDescription className="dark:text-gray-400 text-xs">History of all cases processed and concluded by you.</CardDescription>
+              </div>
+              {visibleTreatedCases.length > 0 && (
+                <Button 
+                  onClick={() => setIsClearConfirmOpen(true)}
+                  variant="outline"
+                  className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-950/20 text-xs font-bold rounded-lg h-9"
+                >
+                  Clear All
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {visibleTreatedCases.map(req => (
+                  <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 dark:hover:bg-white/5 transition-all group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800/50 flex items-center justify-center text-slate-600 dark:text-slate-400">
+                        <FileCheck className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-[#002147] dark:text-white">{req.plot.landCode}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge className={cn("text-[9px] uppercase border-none", 
+                            req.status === 'Completed' ? "bg-emerald-600 text-white dark:bg-emerald-700" :
+                            req.status === 'Rejected' ? "bg-red-600 text-white dark:bg-red-700" :
+                            req.status === 'Cancelled' ? "bg-gray-500 text-white dark:bg-gray-600" :
+                            "bg-blue-600 text-white dark:bg-blue-700"
+                          )}>
+                            {req.status.replace(/_/g, ' ')}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium italic">Buyer: {req.receiver.firstName} {req.receiver.lastName}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        variant="outline" 
+                        className="rounded-lg h-9 px-4 font-bold flex items-center gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-950/20 text-xs"
+                        onClick={() => { setSelectedRequest(req); setIsDetailsOpen(true); }}
+                      >
+                        <Eye className="w-4 h-4" /> View Summary
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {visibleTreatedCases.length === 0 && <div className="p-12 text-center text-muted-foreground text-sm italic">No treated cases to display.</div>}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Sidebar Info */}
@@ -282,8 +370,8 @@ export default function NotaryDashboard() {
                            <span className="text-xs font-bold truncate text-[#002147] dark:text-white">{doc.split('/').pop()}</span>
                         </div>
                         <div className="flex gap-2">
-                           <a href={`http://localhost:5001${doc}`} target="_blank" className="p-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg"><Eye className="w-4 h-4" /></a>
-                           <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${doc}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-lg"><Eye className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${doc}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                      </div>
                    ))}
@@ -303,7 +391,7 @@ export default function NotaryDashboard() {
                              <FileCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                              <span className="text-xs font-bold truncate italic">{doc.split('/').pop()}</span>
                           </div>
-                          <a href={`http://localhost:5001${doc}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
+                          <a href={`http://localhost:5001${doc}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                        </div>
                      ))}
                   </div>
@@ -323,7 +411,7 @@ export default function NotaryDashboard() {
                            <p className="text-[10px] text-muted-foreground">Uploaded by client</p>
                         </div>
                      </div>
-                     <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"><Download className="w-4 h-4" /> Save Receipt</a>
+                     <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40 rounded-lg text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"><Download className="w-4 h-4" /> Save Receipt</a>
                   </div>
                </div>
              )}
@@ -483,6 +571,32 @@ export default function NotaryDashboard() {
                className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white w-full h-12 rounded-xl font-bold gap-2 uppercase tracking-widest text-xs"
              >
                 <Send className="w-4 h-4" /> Authorize &amp; Forward to Registry
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR ALL TREATED CASES CONFIRMATION MODAL */}
+      <Dialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-['Syne'] text-red-700 dark:text-red-500">Clear All Treated Cases</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to clear all treated cases from your view?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+             <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-xs text-red-700 dark:text-red-400 rounded-xl leading-relaxed">
+                <strong>Warning:</strong> This action will only remove the treated cases from this frontend view. It will <strong>NOT</strong> delete any records from the database or impact the actual registry status.
+             </div>
+          </div>
+          <DialogFooter className="gap-2">
+             <Button variant="ghost" onClick={() => setIsClearConfirmOpen(false)} className="rounded-xl h-11 dark:text-white dark:hover:bg-white/10">Cancel</Button>
+             <Button 
+               onClick={handleClearAllTreated}
+               className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
+             >
+                Confirm Clear
              </Button>
           </DialogFooter>
         </DialogContent>

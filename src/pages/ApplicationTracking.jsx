@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   FileSearch, 
@@ -23,6 +23,14 @@ import { Input } from '../app/components/ui/input';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useMyTransfers } from '../hooks/useTransferData';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from '../app/components/ui/dialog';
 
 /**
  * ApplicationTracking Page Component
@@ -36,6 +44,16 @@ export default function ApplicationTracking() {
   const [selectedApp, setSelectedApp] = useState(null);
   const [clickedStep, setClickedStep] = useState({}); // Stores { [appId]: stepId }
 
+  const [clearedAppIds, setClearedAppIds] = useState([]);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`cleared_client_applications_${user._id || user.id}`);
+      setClearedAppIds(saved ? JSON.parse(saved) : []);
+    }
+  }, [user]);
+
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
   const { data: rawTransfers = [], isLoading: loading } = useMyTransfers();
 
@@ -44,7 +62,14 @@ export default function ApplicationTracking() {
     return rawTransfers.map(app => ({
       id: app._id,
       landCode: app.plot?.landCode || "Unknown Code",
+      // The current plot owner at the time of query is the registered seller/lessor
+      sellerName: app.plot?.owner
+        ? `${app.plot.owner.firstName} ${app.plot.owner.lastName}`
+        : app.sender
+          ? `${app.sender.firstName} ${app.sender.lastName}`
+          : "Unknown Seller",
       buyerName: app.receiver ? `${app.receiver.firstName} ${app.receiver.lastName}` : "Unknown Buyer",
+      notaryName: app.notary ? `${app.notary.firstName} ${app.notary.lastName}` : null,
       status: app.status === 'Initiated' ? 'pending' : 
               app.status === 'Under_Verification' ? 'pending' : 
               app.status === 'Awaiting_Fee_Payment' ? 'fee_pending' : 
@@ -106,17 +131,15 @@ export default function ApplicationTracking() {
     return auditLogs[stepId];
   };
 
-  // Filter application files based on query strings, dropdown selections, and role authorization
+  // Filter application files based on search query and status filter.
+  // NOTE: The backend already scopes results per user role (sender/receiver for clients,
+  // assigned notary for Notary officers, assigned LRO for registry officers).
+  // No additional authorization filtering is needed here.
   const filteredApps = applications.filter((app) => {
-    // Normal users can only track applications they initiated (senderId === user.id)
-    // Admins (SuperAdmin) can track all applications
-    const isAuthorized = user?.role === 'SuperAdmin' || 
-                         (app.senderId && (String(app.senderId) === String(user?._id) || String(app.senderId) === String(user?.id)));
-    if (!isAuthorized) return false;
-
     const matchesSearch = 
       app.landCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.buyerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.id.toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
@@ -124,12 +147,31 @@ export default function ApplicationTracking() {
     return matchesSearch && matchesStatus;
   });
 
+  const visibleApps = useMemo(() => {
+    return filteredApps.filter((app) => !clearedAppIds.includes(app.id));
+  }, [filteredApps, clearedAppIds]);
+
+  const handleClearAllApps = () => {
+    const idsToClear = visibleApps.map((a) => a.id);
+    const updated = [...new Set([...clearedAppIds, ...idsToClear])];
+    setClearedAppIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_client_applications_${user._id || user.id}`, JSON.stringify(updated));
+    }
+    setIsClearModalOpen(false);
+    toast.success("Applications cleared from view successfully!");
+  };
+
+  const visibleApplicationsList = useMemo(() => {
+    return applications.filter((app) => !clearedAppIds.includes(app.id));
+  }, [applications, clearedAppIds]);
+
   // Calculate high-level summary metrics for display cards
   const stats = {
-    total: applications.length,
-    pending: applications.filter(a => ['pending', 'fee_pending'].includes(a.status)).length,
-    published: applications.filter(a => a.status === 'published').length,
-    finalized: applications.filter(a => a.status === 'notary_verified').length,
+    total: visibleApplicationsList.length,
+    pending: visibleApplicationsList.filter(a => ['pending', 'fee_pending'].includes(a.status)).length,
+    published: visibleApplicationsList.filter(a => a.status === 'published').length,
+    finalized: visibleApplicationsList.filter(a => a.status === 'notary_verified').length,
   };
 
   /**
@@ -224,9 +266,20 @@ export default function ApplicationTracking() {
     <div className="space-y-8 pb-12 overflow-y-auto h-full pr-6 dark:bg-[#002147] dark:text-gray-100 p-6 transition-colors">
       
       {/* ─── Part 1: Dashboard Header ─── */}
-      <div className="border-b border-white/10 pb-8">
-        <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-[var(--terra-emerald)]">{header.title}</h1>
-        <p className="text-muted-foreground mt-1 dark:text-gray-400 italic">{header.desc}</p>
+      <div className="border-b border-white/10 pb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-[var(--terra-emerald)]">{header.title}</h1>
+          <p className="text-muted-foreground mt-1 dark:text-gray-400 italic">{header.desc}</p>
+        </div>
+        {visibleApps.length > 0 && (
+          <Button 
+            onClick={() => setIsClearModalOpen(true)}
+            variant="outline"
+            className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-950/20 rounded-xl font-bold text-xs px-4 h-10 transition-all shrink-0 self-start sm:self-center"
+          >
+            Clear All Applications
+          </Button>
+        )}
       </div>
 
       {/* ─── Part 2: Quick Metrics Grid ─── */}
@@ -295,14 +348,14 @@ export default function ApplicationTracking() {
             <div className="w-10 h-10 border-4 border-[var(--terra-emerald)] border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-semibold text-gray-400">Loading Land Registry files...</p>
           </div>
-        ) : filteredApps.length === 0 ? (
+        ) : visibleApps.length === 0 ? (
           <Card className="border-none shadow-sm p-12 text-center bg-white/50 dark:bg-white/5 rounded-2xl">
             <FileSearch className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-[#002147] font-['Syne']">No Applications Found</h3>
             <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">There are no active land registry transfer files matching your current search parameters.</p>
           </Card>
         ) : (
-          filteredApps.map((app) => {
+          visibleApps.map((app) => {
             const currentStep = getActiveStep(app.status);
             
             return (
@@ -493,7 +546,9 @@ export default function ApplicationTracking() {
                   </div>
                   <div className="p-4 bg-gray-50 rounded-xl space-y-1">
                     <p className="text-xs text-gray-400 font-bold uppercase">Assigned Notary</p>
-                    <p className="text-sm font-semibold text-[#002147]">Me André Fotso (CH10001)</p>
+                    <p className="text-sm font-semibold text-[#002147]">
+                      {selectedApp.notaryName || "Not yet assigned"}
+                    </p>
                   </div>
                 </div>
 
@@ -501,11 +556,11 @@ export default function ApplicationTracking() {
                   <p className="text-xs text-gray-400 font-bold uppercase">Transaction Parties</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500 font-medium">Seller/Lessor:</span>
-                      <span className="text-[#002147] font-bold">Jean-Claude Mbarga</span>
+                      <span className="text-gray-500 font-medium">Seller / Current Owner:</span>
+                      <span className="text-[#002147] font-bold">{selectedApp.sellerName}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500 font-medium">Buyer/Transferee:</span>
+                      <span className="text-gray-500 font-medium">Buyer / Transferee:</span>
                       <span className="text-[#002147] font-bold">{selectedApp.buyerName}</span>
                     </div>
                   </div>
@@ -536,6 +591,38 @@ export default function ApplicationTracking() {
           </div>
         </div>
       )}
+
+      {/* ─── Part 6: Clear All Confirmation Modal ─── */}
+      <Dialog open={isClearModalOpen} onOpenChange={setIsClearModalOpen}>
+        <DialogContent className="max-w-md bg-white dark:bg-slate-900 border border-gray-100 dark:border-white/10 rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-[#002147] dark:text-white font-['Syne']">
+              Clear All Applications?
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
+              This action will hide all currently visible applications from your tracker view on this device. 
+              <span className="block mt-2 font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                Note: This is a frontend-only action. Your active database titles, legal transfers, and land ownership status will remain entirely unaffected.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex justify-end gap-3">
+            <Button
+              variant="outline"
+              className="rounded-xl px-4 py-2 border-gray-200 dark:border-white/10 dark:text-gray-300"
+              onClick={() => setIsClearModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-5 py-2 font-bold transition-all shadow-md shadow-red-600/10"
+              onClick={handleClearAllApps}
+            >
+              Confirm Clear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

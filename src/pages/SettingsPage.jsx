@@ -262,7 +262,12 @@ export default function SettingsPage() {
 
   const handleExportPDF = () => {
     toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 2000)),
+      new Promise((resolve) => {
+        setTimeout(() => {
+          window.open('http://localhost:5001/assets/default-profile.png', '_blank');
+          resolve();
+        }, 2000);
+      }),
       {
         loading: 'Generating PDF Registry...',
         success: 'PDF Registry exported successfully!',

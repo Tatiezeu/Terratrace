@@ -3,60 +3,65 @@ import { motion, AnimatePresence } from "motion/react";
 import { Check, RefreshCw, HelpCircle, Eye } from "lucide-react";
 import { Button } from "../ui/button";
 
-// 30 images covering 10 categories
+// 33 images covering 11 categories
 const CAPTCHA_IMAGES_DATA = [
   // Cars
-  { id: "car-1", category: "Cars", url: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=200&h=200&fit=crop" },
-  { id: "car-2", category: "Cars", url: "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=200&h=200&fit=crop" },
-  { id: "car-3", category: "Cars", url: "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=200&h=200&fit=crop" },
+  { id: "car-1", category: "Cars", url: "/captcha/car-1.jpg" },
+  { id: "car-2", category: "Cars", url: "/captcha/car-2.jpg" },
+  { id: "car-3", category: "Cars", url: "/captcha/car-3.jpg" },
   
   // Bridges
-  { id: "bridge-1", category: "Bridges", url: "https://images.unsplash.com/photo-1545048702-79362596cdc9?w=200&h=200&fit=crop" },
-  { id: "bridge-2", category: "Bridges", url: "https://images.unsplash.com/photo-1508193638397-1c4234db14d8?w=200&h=200&fit=crop" },
-  { id: "bridge-3", category: "Bridges", url: "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=200&h=200&fit=crop" },
+  { id: "bridge-1", category: "Bridges", url: "/captcha/bridge-1.jpg" },
+  { id: "bridge-2", category: "Bridges", url: "/captcha/bridge-2.jpg" },
+  { id: "bridge-3", category: "Bridges", url: "/captcha/bridge-3.jpg" },
   
   // Stairs
-  { id: "stairs-1", category: "Stairs", url: "https://images.unsplash.com/photo-1507652313519-d4e9174996dd?w=200&h=200&fit=crop" },
-  { id: "stairs-2", category: "Stairs", url: "https://images.unsplash.com/photo-1566438480900-0609be27a4be?w=200&h=200&fit=crop" },
-  { id: "stairs-3", category: "Stairs", url: "https://images.unsplash.com/photo-1504198453319-5ce911bafcde?w=200&h=200&fit=crop" },
+  { id: "stairs-1", category: "Stairs", url: "/captcha/stairs-1.jpg" },
+  { id: "stairs-2", category: "Stairs", url: "/captcha/stairs-2.jpg" },
+  { id: "stairs-3", category: "Stairs", url: "/captcha/stairs-3.jpg" },
   
   // Bicycles
-  { id: "bike-1", category: "Bicycles", url: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=200&h=200&fit=crop" },
-  { id: "bike-2", category: "Bicycles", url: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?w=200&h=200&fit=crop" },
-  { id: "bike-3", category: "Bicycles", url: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?w=200&h=200&fit=crop" },
+  { id: "bike-1", category: "Bicycles", url: "/captcha/bike-1.jpg" },
+  { id: "bike-2", category: "Bicycles", url: "/captcha/bike-2.jpg" },
+  { id: "bike-3", category: "Bicycles", url: "/captcha/bike-3.jpg" },
   
   // Traffic Lights
-  { id: "light-1", category: "Traffic Lights", url: "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=200&h=200&fit=crop" },
-  { id: "light-2", category: "Traffic Lights", url: "https://images.unsplash.com/photo-1518364538800-6bcb3f25da49?w=200&h=200&fit=crop" },
-  { id: "light-3", category: "Traffic Lights", url: "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=200&h=200&fit=crop" },
+  { id: "light-1", category: "Traffic Lights", url: "/captcha/light-1.jpg" },
+  { id: "light-2", category: "Traffic Lights", url: "/captcha/light-2.jpg" },
+  { id: "light-3", category: "Traffic Lights", url: "/captcha/light-3.jpg" },
   
   // Crosswalks
-  { id: "walk-1", category: "Crosswalks", url: "https://images.unsplash.com/photo-1478760329108-5c3ed9d495a0?w=200&h=200&fit=crop" },
-  { id: "walk-2", category: "Crosswalks", url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&h=200&fit=crop" },
-  { id: "walk-3", category: "Crosswalks", url: "https://images.unsplash.com/photo-1517483000871-1dbf64a6e1c6?w=200&h=200&fit=crop" },
+  { id: "walk-1", category: "Crosswalks", url: "/captcha/walk-1.jpg" },
+  { id: "walk-2", category: "Crosswalks", url: "/captcha/walk-2.jpg" },
+  { id: "walk-3", category: "Crosswalks", url: "/captcha/walk-3.jpg" },
   
   // Fire Hydrants
-  { id: "hydrant-1", category: "Fire Hydrants", url: "https://images.unsplash.com/photo-1549488344-1f9b8d2bd1f3?w=200&h=200&fit=crop" },
-  { id: "hydrant-2", category: "Fire Hydrants", url: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=200&h=200&fit=crop" },
-  { id: "hydrant-3", category: "Fire Hydrants", url: "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?w=200&h=200&fit=crop" },
+  { id: "hydrant-1", category: "Fire Hydrants", url: "/captcha/hydrant-1.jpg" },
+  { id: "hydrant-2", category: "Fire Hydrants", url: "/captcha/hydrant-2.jpg" },
+  { id: "hydrant-3", category: "Fire Hydrants", url: "/captcha/hydrant-3.jpg" },
   
   // Buses
-  { id: "bus-1", category: "Buses", url: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=200&fit=crop" },
-  { id: "bus-2", category: "Buses", url: "https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=200&h=200&fit=crop" },
-  { id: "bus-3", category: "Buses", url: "https://images.unsplash.com/photo-1494516268441-2b7c595cd6f4?w=200&h=200&fit=crop" },
+  { id: "bus-1", category: "Buses", url: "/captcha/bus-1.jpg" },
+  { id: "bus-2", category: "Buses", url: "/captcha/bus-2.jpg" },
+  { id: "bus-3", category: "Buses", url: "/captcha/bus-3.jpg" },
   
   // Mountains
-  { id: "mountain-1", category: "Mountains", url: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=200&h=200&fit=crop" },
-  { id: "mountain-2", category: "Mountains", url: "https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=200&h=200&fit=crop" },
-  { id: "mountain-3", category: "Mountains", url: "https://images.unsplash.com/photo-1486873249359-2731bd6dafc7?w=200&h=200&fit=crop" },
+  { id: "mountain-1", category: "Mountains", url: "/captcha/mountain-1.jpg" },
+  { id: "mountain-2", category: "Mountains", url: "/captcha/mountain-2.jpg" },
+  { id: "mountain-3", category: "Mountains", url: "/captcha/mountain-3.jpg" },
   
   // Trees
-  { id: "tree-1", category: "Trees", url: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=200&h=200&fit=crop" },
-  { id: "tree-2", category: "Trees", url: "https://images.unsplash.com/photo-1448375240586-882707db888b?w=200&h=200&fit=crop" },
-  { id: "tree-3", category: "Trees", url: "https://images.unsplash.com/photo-1513836279014-a89f7a76ae86?w=200&h=200&fit=crop" }
+  { id: "tree-1", category: "Trees", url: "/captcha/tree-1.jpg" },
+  { id: "tree-2", category: "Trees", url: "/captcha/tree-2.jpg" },
+  { id: "tree-3", category: "Trees", url: "/captcha/tree-3.jpg" },
+ 
+  // Motos
+  { id: "moto-1", category: "Motos", url: "/captcha/moto-1.jpg" },
+  { id: "moto-2", category: "Motos", url: "/captcha/moto-2.jpg" },
+  { id: "moto-3", category: "Motos", url: "/captcha/moto-3.jpg" }
 ];
 
-const CATEGORIES = ["Cars", "Bridges", "Stairs", "Bicycles", "Traffic Lights", "Crosswalks", "Fire Hydrants", "Buses", "Mountains", "Trees"];
+const CATEGORIES = ["Cars", "Bridges", "Stairs", "Bicycles", "Traffic Lights", "Crosswalks", "Fire Hydrants", "Buses", "Mountains", "Trees", "Motos"];
 
 // Modern offline vector fallbacks for ultimate network resilience
 const renderFallbackIcon = (category, isSelected) => {
@@ -158,6 +163,17 @@ const renderFallbackIcon = (category, isSelected) => {
           <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Mountain</span>
         </div>
       );
+    case "Motos":
+      return (
+        <div className={`${baseClasses} bg-gradient-to-br from-purple-500 to-indigo-600`}>
+          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="5.5" cy="17.5" r="2.5" />
+            <circle cx="18.5" cy="17.5" r="2.5" />
+            <path d="M12 10V6H9M5.5 17.5l3-6.5h7.5L18.5 17.5M10.5 13h3.5" />
+          </svg>
+          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Moto</span>
+        </div>
+      );
     case "Trees":
     default:
       return (
@@ -192,7 +208,6 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
 
     // 3. Determine target count (between 3 and 5)
     const targetCount = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
-    const distractorCount = 9 - targetCount;
 
     // Shuffle both sets
     const shuffledTargets = [...targets].sort(() => 0.5 - Math.random());
@@ -200,6 +215,8 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
 
     // Select the required amounts
     const selectedTargets = shuffledTargets.slice(0, targetCount);
+    // Dynamically calculate distractor count to guarantee exactly 9 total images in the grid
+    const distractorCount = 9 - selectedTargets.length;
     const selectedDistractors = shuffledDistractors.slice(0, distractorCount);
 
     // Combine and shuffle the final 9 images

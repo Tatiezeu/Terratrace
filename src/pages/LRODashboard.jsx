@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import { 
   Gavel, 
@@ -60,6 +61,7 @@ const statusConfig = {
 };
 
 export default function LRODashboard() {
+  const { user } = useAuth();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const [isApprovalOpen, setIsApprovalOpen] = useState(false);
@@ -73,6 +75,27 @@ export default function LRODashboard() {
   const { data: plots = [] } = useLandPlots();
   const { data: transfers = [] } = useMyTransfers();
 
+  // ─── Frontend-only Clear States ──────────────────────────────────────────────
+  const [clearedTransferIds, setClearedTransferIds] = useState([]);
+  const [clearedPlotIds, setClearedPlotIds] = useState([]);
+  const [isClearTransfersModalOpen, setIsClearTransfersModalOpen] = useState(false);
+  const [isClearPlotsModalOpen, setIsClearPlotsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const keyTransfers = `cleared_lro_transfers_${user._id || user.id}`;
+      const keyPlots = `cleared_lro_plots_${user._id || user.id}`;
+      const savedTransfers = localStorage.getItem(keyTransfers);
+      const savedPlots = localStorage.getItem(keyPlots);
+      setClearedTransferIds(savedTransfers ? JSON.parse(savedTransfers) : []);
+      setClearedPlotIds(savedPlots ? JSON.parse(savedPlots) : []);
+    }
+  }, [user]);
+
+  const visibleTransfers = useMemo(() => {
+    return transfers.filter(req => !clearedTransferIds.includes(req._id));
+  }, [transfers, clearedTransferIds]);
+
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
       const q = searchQuery.toLowerCase();
@@ -82,6 +105,32 @@ export default function LRODashboard() {
       return matchesSearch && matchesStatus;
     });
   }, [searchQuery, activeStatusFilter, plots]);
+
+  const visiblePlots = useMemo(() => {
+    return filteredPlots.filter(plot => !clearedPlotIds.includes(plot._id));
+  }, [filteredPlots, clearedPlotIds]);
+
+  const handleClearAllTransfers = () => {
+    const idsToClear = visibleTransfers.map(t => t._id);
+    const updated = [...new Set([...clearedTransferIds, ...idsToClear])];
+    setClearedTransferIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_lro_transfers_${user._id || user.id}`, JSON.stringify(updated));
+    }
+    setIsClearTransfersModalOpen(false);
+    toast.success("Transferred applications cleared from view!");
+  };
+
+  const handleClearAllPlots = () => {
+    const idsToClear = visiblePlots.map(p => p._id);
+    const updated = [...new Set([...clearedPlotIds, ...idsToClear])];
+    setClearedPlotIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_lro_plots_${user._id || user.id}`, JSON.stringify(updated));
+    }
+    setIsClearPlotsModalOpen(false);
+    toast.success("Regional registry land plots cleared from view!");
+  };
 
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -104,11 +153,11 @@ export default function LRODashboard() {
     try {
         if (!rejectionReason) return toast.error("Please provide a reason");
         const res = await api.patch(`/transfer/${requestId}/status`, { 
-            status: 'Under_Verification',
-            feedback: `LRO Rejection: ${rejectionReason}`
+            status: 'Rejected',
+            feedback: rejectionReason
         });
         if (res.data.success) {
-            toast.info("Application sent back to Notary for re-verification");
+            toast.error("Application officially rejected and closed");
             queryClient.invalidateQueries({ queryKey: ["land"] });
             queryClient.invalidateQueries({ queryKey: ["transfers"] });
             setIsRejectModalOpen(false);
@@ -158,15 +207,26 @@ export default function LRODashboard() {
 
       {/* Forwarded Applications Section */}
       <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10">
-        <CardHeader className="bg-muted/30 dark:bg-slate-800/50 py-4">
-          <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2">
-            <FileCheck className="w-5 h-5 text-blue-600" /> Forwarded Transfer Applications
-          </CardTitle>
-          <p className="text-xs text-muted-foreground">Applications verified by Notaries awaiting final registry authorization.</p>
+        <CardHeader className="bg-muted/30 dark:bg-slate-800/50 py-4 flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg font-bold font-['Syne'] flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-blue-600" /> Forwarded Transfer Applications
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Applications verified by Notaries awaiting final registry authorization.</p>
+          </div>
+          {visibleTransfers.length > 0 && (
+            <Button 
+              onClick={() => setIsClearTransfersModalOpen(true)}
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-950/20 text-xs font-bold rounded-lg h-9"
+            >
+              Clear All
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {transfers.map(req => (
+            {visibleTransfers.map(req => (
               <div key={req._id} className="p-5 flex items-center justify-between hover:bg-muted/30 dark:hover:bg-white/5 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
@@ -229,7 +289,7 @@ export default function LRODashboard() {
                 </div>
               </div>
             ))}
-            {transfers.length === 0 && <div className="p-12 text-center text-muted-foreground text-sm">No applications currently forwarded to you.</div>}
+            {visibleTransfers.length === 0 && <div className="p-12 text-center text-muted-foreground text-sm">No applications currently forwarded to you.</div>}
           </div>
         </CardContent>
       </Card>
@@ -237,15 +297,29 @@ export default function LRODashboard() {
       {/* Regional Registry Table */}
       <Card className="border-none shadow-sm overflow-hidden rounded-2xl bg-white dark:bg-white/5 dark:border dark:border-white/10">
         <CardHeader className="flex flex-row items-center justify-between py-4 border-b dark:border-white/10 dark:bg-slate-800/50">
-          <CardTitle className="text-lg font-bold font-['Syne']">Regional Registry</CardTitle>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Search registry..." className="pl-10 h-9 rounded-xl text-xs" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          <div className="flex flex-col gap-1">
+            <CardTitle className="text-lg font-bold font-['Syne']">Regional Registry</CardTitle>
+            <p className="text-xs text-muted-foreground">Detailed catalog of registered land plots in your region.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input placeholder="Search registry..." className="pl-10 h-9 rounded-xl text-xs" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            {visiblePlots.length > 0 && (
+              <Button 
+                onClick={() => setIsClearPlotsModalOpen(true)}
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-950/20 text-xs font-bold rounded-lg h-9 shrink-0"
+              >
+                Clear All
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y divide-border">
-            {filteredPlots.map((plot) => (
+            {visiblePlots.map((plot) => (
               <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 dark:hover:bg-white/5 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0">
@@ -346,7 +420,7 @@ export default function LRODashboard() {
                            </div>
                            <div className="flex gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-400" onClick={() => window.open(`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`, '_blank')}><Eye className="w-4 h-4" /></Button>
-                              <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} download className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
+                              <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-lg"><Download className="w-4 h-4" /></a>
                            </div>
                         </div>
                       ))}
@@ -362,7 +436,7 @@ export default function LRODashboard() {
                               <ShieldCheck className="w-4 h-4 text-emerald-600" />
                               <span className="text-[11px] font-bold truncate max-w-[200px] text-[#002147] dark:text-white">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Certified_Dossier_${i+1}`)}</span>
                            </div>
-                           <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} download className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                       ))}
                       {selectedRequest?.paymentReceipt && (
@@ -371,12 +445,31 @@ export default function LRODashboard() {
                               <CreditCard className="w-4 h-4 text-amber-600" />
                               <span className="text-[11px] font-bold">Payment Receipt</span>
                            </div>
-                           <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} download className="p-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <a href={`http://localhost:5001${selectedRequest.paymentReceipt}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600 dark:text-amber-400 rounded-lg"><Download className="w-4 h-4" /></a>
                         </div>
                       )}
                    </div>
                 </div>
 
+                {selectedRequest?.certifiedDocuments && selectedRequest.certifiedDocuments.length > 0 && (
+                  <div>
+                     <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase px-1 mb-2">Notary Certified Final Documents</p>
+                     <div className="grid grid-cols-1 gap-2">
+                        {selectedRequest.certifiedDocuments.map((doc, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 rounded-xl border bg-indigo-50/20 dark:bg-indigo-950/10 border-indigo-100 dark:border-indigo-800/30 shadow-sm hover:border-indigo-200 dark:hover:border-indigo-800/40 transition-colors">
+                             <div className="flex items-center gap-3">
+                                <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                <span className="text-[11px] font-bold truncate max-w-[200px] text-[#002147] dark:text-white">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Certified_Final_${i+1}`)}</span>
+                             </div>
+                             <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400" onClick={() => window.open(`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`, '_blank')}><Eye className="w-4 h-4" /></Button>
+                                <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-indigo-50 text-indigo-600 dark:text-indigo-400 rounded-lg"><Download className="w-4 h-4" /></a>
+                             </div>
+                          </div>
+                        ))}
+                     </div>
+                  </div>
+                )}
              </div>
           </div>
 
@@ -433,13 +526,15 @@ export default function LRODashboard() {
 
                    <Button 
                       disabled={
+                        selectedRequest?.status === 'Rejected' ||
+                        selectedRequest?.status === 'Cancelled' ||
                         (selectedRequest?.status === 'Public_Notice' && selectedRequest?.publicNotice?.endDate && new Date() < new Date(selectedRequest.publicNotice.endDate)) ||
                         selectedRequest?.plot?.status === 'disputed'
                       }
                       onClick={() => handleAuthorize(selectedRequest._id)} 
                       className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 h-10 rounded-lg font-black shadow-lg shadow-emerald-500/20 uppercase tracking-widest text-[10px] disabled:opacity-50"
                    >
-                      {selectedRequest?.plot?.status === 'disputed' ? 'LOCKED (DISPUTED)' : 'Authorize Transfer'}
+                      {selectedRequest?.status === 'Rejected' ? 'Dossier Rejected' : selectedRequest?.plot?.status === 'disputed' ? 'LOCKED (DISPUTED)' : 'Authorize Transfer'}
                    </Button>
                 </>
              )}
@@ -513,6 +608,58 @@ export default function LRODashboard() {
                className={cn("rounded-xl font-bold h-11 px-6", disputeTarget?.status === 'disputed' ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700", "text-white")}
              >
                 {disputeTarget?.status === 'disputed' ? 'Confirm Lift Dispute' : 'Confirm Dispute'}
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR ALL TRANSFERS CONFIRMATION MODAL */}
+      <Dialog open={isClearTransfersModalOpen} onOpenChange={setIsClearTransfersModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-['Syne'] text-red-700 dark:text-red-500">Clear Transferred Applications</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to clear all currently listed transferred applications from your view?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+             <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-xs text-red-700 dark:text-red-400 rounded-xl leading-relaxed">
+                <strong>Warning:</strong> This action will only remove the applications from this frontend list view. It will <strong>NOT</strong> delete any records from the database or impact the actual registry status.
+             </div>
+          </div>
+          <DialogFooter className="gap-2">
+             <Button variant="ghost" onClick={() => setIsClearTransfersModalOpen(false)} className="rounded-xl h-11 dark:text-white dark:hover:bg-white/10">Cancel</Button>
+             <Button 
+               onClick={handleClearAllTransfers}
+               className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
+             >
+                Confirm Clear
+             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CLEAR ALL PLOTS CONFIRMATION MODAL */}
+      <Dialog open={isClearPlotsModalOpen} onOpenChange={setIsClearPlotsModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-['Syne'] text-red-700 dark:text-red-500">Clear Regional Registry Plots</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to clear all currently listed plots from your registry view?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+             <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-xs text-red-700 dark:text-red-400 rounded-xl leading-relaxed">
+                <strong>Warning:</strong> This action will only remove the plots from this frontend view. It will <strong>NOT</strong> delete any land records or ownership properties from the database.
+             </div>
+          </div>
+          <DialogFooter className="gap-2">
+             <Button variant="ghost" onClick={() => setIsClearPlotsModalOpen(false)} className="rounded-xl h-11 dark:text-white dark:hover:bg-white/10">Cancel</Button>
+             <Button 
+               onClick={handleClearAllPlots}
+               className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
+             >
+                Confirm Clear
              </Button>
           </DialogFooter>
         </DialogContent>

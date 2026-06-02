@@ -14,12 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import api from "../../../utils/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function RegisterOfficerModal({
   open,
   onClose,
   officerType,
 }) {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -53,6 +55,7 @@ export function RegisterOfficerModal({
               }
             );
 
+            queryClient.invalidateQueries({ queryKey: ['users', 'all'] });
             onClose();
             setFormData({
               firstName: "",

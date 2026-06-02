@@ -22,8 +22,10 @@ import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
 import api from "../../../utils/api";
 import { mockOfficers } from "../../../data/mockData";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function RegisterLandownerModal({ open, onClose }) {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     // Land Section
     landType: "",
@@ -134,6 +136,7 @@ export function RegisterLandownerModal({ open, onClose }) {
             toast.success("Landowner & Plot registered successfully!", {
                 description: `Generated Land Code: ${landCode}`,
             });
+            queryClient.invalidateQueries({ queryKey: ["land"] });
             onClose();
             setFormData({
               landType: "",

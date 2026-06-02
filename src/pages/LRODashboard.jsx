@@ -96,15 +96,29 @@ export default function LRODashboard() {
     return transfers.filter(req => !clearedTransferIds.includes(req._id));
   }, [transfers, clearedTransferIds]);
 
+  const objectionPlotIds = useMemo(() => {
+    return transfers
+      .filter(t => t.objections && t.objections.length > 0)
+      .map(t => {
+        const pId = t.plot?._id || t.plot;
+        return typeof pId === 'object' ? pId?._id?.toString() || pId?.toString() : pId?.toString();
+      })
+      .filter(Boolean);
+  }, [transfers]);
+
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
+      const plotIdStr = plot._id?.toString();
+      const hasObjections = objectionPlotIds.includes(plotIdStr);
+      if (!hasObjections) return false;
+
       const q = searchQuery.toLowerCase();
       const ownerName = plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "";
       const matchesSearch = !q || plot.landCode.toLowerCase().includes(q) || plot.location.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q);
       const matchesStatus = !activeStatusFilter || plot.status === activeStatusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, activeStatusFilter, plots]);
+  }, [searchQuery, activeStatusFilter, plots, objectionPlotIds]);
 
   const visiblePlots = useMemo(() => {
     return filteredPlots.filter(plot => !clearedPlotIds.includes(plot._id));
@@ -337,9 +351,9 @@ export default function LRODashboard() {
                    <Button 
                      variant="outline" 
                      size="sm" 
-                     disabled={!['under_review', 'under_transfer', 'disputed'].includes(plot.status)}
+                     disabled={!['under_review', 'under_transfer', 'disputed'].includes(plot.status) && !objectionPlotIds.includes(plot._id?.toString())}
                      onClick={() => { setDisputeTarget({ id: plot._id, status: plot.status, code: plot.landCode }); setIsDisputeModalOpen(true); }}
-                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20", plot.status === 'disputed' && "bg-amber-600 text-white border-none", !['under_review', 'under_transfer', 'disputed'].includes(plot.status) && "opacity-30 cursor-not-allowed")}
+                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20", plot.status === 'disputed' && "bg-amber-600 text-white border-none", (!['under_review', 'under_transfer', 'disputed'].includes(plot.status) && !objectionPlotIds.includes(plot._id?.toString())) && "opacity-30 cursor-not-allowed")}
                    >
                      <AlertTriangle className="w-3.5 h-3.5" />
                      {plot.status === 'disputed' ? 'Lift Dispute' : 'Dispute Land'}

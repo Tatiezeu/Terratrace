@@ -35,6 +35,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Badge } from "../ui/badge";
 import api from "../../../utils/api";
 import { logActivity } from "../../../utils/logger";
+import { useQueryClient } from "@tanstack/react-query";
 
 const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpeg,.png", multiple = false }) => {
   const fileArray = Array.isArray(files) ? files : (files ? [files] : []);
@@ -107,6 +108,7 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
 
 export function TransferRequestModal({ plot, open, onClose }) {
   const isDirectGrant = plot?.landType === "00050";
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(0); 
   const [transferType, setTransferType] = useState(null); 
   const [portionType, setPortionType] = useState("full"); 
@@ -168,6 +170,8 @@ export function TransferRequestModal({ plot, open, onClose }) {
       if (response.data.success) {
         setStep(isDirectGrant ? 2 : 4);
         toast.success(isDirectGrant ? "Application submitted!" : "Transfer request submitted!");
+        queryClient.invalidateQueries({ queryKey: ['transfers'] });
+        queryClient.invalidateQueries({ queryKey: ['land'] });
         logActivity('Create', `User initiated ${isDirectGrant ? 'direct grant application' : 'transfer request'} for Plot '${plot.landCode}'`);
       }
     } catch (err) {

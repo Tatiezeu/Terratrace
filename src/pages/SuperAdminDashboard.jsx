@@ -26,8 +26,10 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllUsers } from "../hooks/useAdminData";
 import { useLandPlots } from "../hooks/useLandData";
 import { useNotifications } from "../hooks/useNotificationsData";
+import { useAuth } from "../context/AuthContext";
 
 export default function SuperAdminDashboard() {
+  const { user } = useAuth();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [officerType, setOfficerType] = useState("lro");
   const [officerSearch, setOfficerSearch] = useState("");
@@ -131,6 +133,31 @@ export default function SuperAdminDashboard() {
     } catch (err) {
       toast.error("Failed to clear notifications");
     }
+  };
+
+  const [clearedLogIds, setClearedLogIds] = useState([]);
+  const [isClearLogsModalOpen, setIsClearLogsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      const savedClearedLogs = localStorage.getItem(`cleared_logs_${user._id || user.id}`);
+      setClearedLogIds(savedClearedLogs ? JSON.parse(savedClearedLogs) : []);
+    }
+  }, [user]);
+
+  const visibleLogs = useMemo(() => {
+    return activityLogs.filter(log => !clearedLogIds.includes(log._id || log.id));
+  }, [activityLogs, clearedLogIds]);
+
+  const handleClearAllLogs = () => {
+    const idsToClear = visibleLogs.map(l => l._id || l.id);
+    const updated = [...new Set([...clearedLogIds, ...idsToClear])];
+    setClearedLogIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_logs_${user._id || user.id}`, JSON.stringify(updated));
+    }
+    setIsClearLogsModalOpen(false);
+    toast.success("Activity logs cleared from frontend view!");
   };
 
   return (
@@ -357,15 +384,24 @@ export default function SuperAdminDashboard() {
           </Card>
 
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-muted">
               <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
                 <ScrollText className="w-5 h-5 text-[var(--terra-emerald)]" />
                 Log Activity
               </CardTitle>
+              {visibleLogs.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsClearLogsModalOpen(true)}
+                  className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/30 dark:hover:bg-red-950/20 text-xs font-bold h-9 px-3"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear All
+                </Button>
+              )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               <div className="space-y-4">
-                {(activityLogs.length > 0 ? (showAllLogs ? activityLogs : activityLogs.slice(0, 8)) : (showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4))).map((log) => {
+                {(visibleLogs.length > 0 ? (showAllLogs ? visibleLogs : visibleLogs.slice(0, 8)) : (showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4))).map((log) => {
                   const logTime = log.timestamp 
                     ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
                     : (log.time?.split(" ")[1] || "");
@@ -428,6 +464,31 @@ export default function SuperAdminDashboard() {
             <Button onClick={executeClearAllNotif} className="flex-1 bg-red-500 hover:bg-red-600 text-white rounded-xl h-11 font-bold shadow-lg shadow-red-500/20">
               Yes, Clear All
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* CLEAR ALL LOGS CONFIRMATION MODAL */}
+      <Dialog open={isClearLogsModalOpen} onOpenChange={setIsClearLogsModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border dark:border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-['Syne'] text-red-700 dark:text-red-500">Clear Activity Logs</DialogTitle>
+            <DialogDescription className="dark:text-gray-400">
+              Are you sure you want to clear all currently listed activity logs from your view?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+             <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-xs text-red-700 dark:text-red-400 rounded-xl leading-relaxed">
+                <strong>Warning:</strong> This action will only remove the logs from this frontend view. It will <strong>NOT</strong> delete any audit records or security logs from the backend database.
+             </div>
+          </div>
+          <DialogFooter className="gap-2">
+             <Button variant="ghost" onClick={() => setIsClearLogsModalOpen(false)} className="rounded-xl h-11 dark:text-white dark:hover:bg-white/10">Cancel</Button>
+             <Button 
+               onClick={handleClearAllLogs}
+               className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
+             >
+                Confirm Clear
+             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

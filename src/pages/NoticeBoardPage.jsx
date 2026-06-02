@@ -28,6 +28,16 @@ export default function NoticeBoardPage() {
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
   const { data: notices = [] } = usePublicNotices();
 
+  const [config, setConfig] = useState(null);
+
+  useEffect(() => {
+    api.get('/config')
+      .then(res => {
+        if (res.data.success) setConfig(res.data.data);
+      })
+      .catch(err => console.warn("Failed to load config:", err));
+  }, []);
+
   // ─── UI state ─────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("All");
@@ -77,6 +87,8 @@ export default function NoticeBoardPage() {
       await api.post(`/transfer/${selectedNotice._id}/objection`, { reason: objectionMsg });
       toast.success("Objection submitted successfully!");
       setObjectionOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['transfers', 'public-notices'] });
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
     } catch (err) {
       toast.error("Failed to submit objection");
     }
@@ -302,7 +314,7 @@ export default function NoticeBoardPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <CountdownDisplay targetDate={selectedNotice?.publicNotice?.endDate} />
+          <CountdownDisplay targetDate={selectedNotice?.publicNotice?.endDate} config={config} />
 
           <Button onClick={() => setCountdownOpen(false)} className="w-full bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white h-12 rounded-xl text-sm font-bold uppercase tracking-widest">
             Close View
@@ -340,7 +352,7 @@ export default function NoticeBoardPage() {
   );
 }
 
-function CountdownDisplay({ targetDate }) {
+function CountdownDisplay({ targetDate, config }) {
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
@@ -360,8 +372,14 @@ function CountdownDisplay({ targetDate }) {
       const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
       
-      // Default to 30 days for progress calculation, or actual duration if larger
-      const maxDuration = 30 * 24 * 60 * 60 * 1000;
+      const testMode = config?.noticeTestMode;
+      const testMinutes = config?.noticeTestMinutes || 10;
+      const durationDays = config?.noticeDurationDays || 30;
+
+      const maxDuration = testMode
+        ? testMinutes * 60 * 1000
+        : durationDays * 24 * 60 * 60 * 1000;
+
       const percentage = Math.min(100, (distance / maxDuration) * 100);
 
       return { days, hours, minutes, seconds, percentage, isExpired: false };

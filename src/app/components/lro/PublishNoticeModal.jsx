@@ -15,8 +15,10 @@ import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
 
 import api from "../../../utils/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function PublishNoticeModal({ open, onClose, request }) {
+  const queryClient = useQueryClient();
   const [publicationMessage, setPublicationMessage] = useState("The land in question is about to be transferred.");
   const [config, setConfig] = useState(null);
 
@@ -47,6 +49,8 @@ export function PublishNoticeModal({ open, onClose, request }) {
         }
       });
       toast.success("Public Notice Published Successfully!");
+      queryClient.invalidateQueries({ queryKey: ["land"] });
+      queryClient.invalidateQueries({ queryKey: ["transfers"] });
       onClose();
     } catch (err) {
       toast.error("Failed to publish notice");

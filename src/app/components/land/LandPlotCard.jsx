@@ -6,6 +6,7 @@ import { cn } from "../ui/utils";
 import { useAuth } from "../../../context/AuthContext";
 import api from "../../../utils/api";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const getStatusConfig = (status) => {
   switch (status) {
@@ -52,6 +53,7 @@ const getStatusConfig = (status) => {
 
 export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const statusConfig = getStatusConfig(plot.status);
 
   const isOwner = user && (
@@ -63,7 +65,11 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
 
   const handleUnblockRequest = () => {
     api.post('/notifications/unblock-request', { plotId: plot._id, plotCode: plot.landCode })
-      .then(() => toast.success("Request sent to Super Admin"))
+      .then(() => {
+        toast.success("Request sent to Super Admin");
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      })
       .catch(err => {
         console.error("Unblock req error:", err);
         toast.error(err.response?.data?.message || "Failed to send request");
@@ -74,7 +80,11 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
     const message = prompt("Please enter your justification to lift the dispute:");
     if (!message) return;
     api.post(`/transfer/plot/${plot._id}/undispute`, { message })
-      .then(() => toast.success("Undispute request sent to Land Registry Officer"))
+      .then(() => {
+        toast.success("Undispute request sent to Land Registry Officer");
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['transfers'] });
+      })
       .catch(err => toast.error("Failed to send request"));
   };
 
@@ -145,7 +155,11 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
                   const nextMap = { 'cleared': 'blocked', 'blocked': isPublic ? 'flagged' : 'cleared', 'flagged': 'blocked', 'transferred': 'cleared' };
                   const newStatus = nextMap[plot.status] || 'cleared';
                   api.patch(`/land/${plot._id}/status`, { status: newStatus })
-                    .then(() => { toast.success(`Status updated to ${newStatus}`); window.dispatchEvent(new CustomEvent('land-updated')); });
+                    .then(() => {
+                      toast.success(`Status updated to ${newStatus}`);
+                      queryClient.invalidateQueries({ queryKey: ['land'] });
+                      queryClient.invalidateQueries({ queryKey: ['land', 'my-plots'] });
+                    });
                 }}
                 variant="ghost" size="icon" className="shrink-0 border border-border"
               >

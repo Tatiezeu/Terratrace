@@ -118,6 +118,7 @@ export default function NotaryDashboard() {
       if (res.data.success) {
         toast.success(`Application updated to ${status.replace(/_/g, ' ')}`);
         queryClient.invalidateQueries({ queryKey: ['transfers'] });
+        queryClient.invalidateQueries({ queryKey: ['land'] });
         setIsVerificationOpen(false);
         setIsFeeModalOpen(false);
         setIsForwardModalOpen(false);

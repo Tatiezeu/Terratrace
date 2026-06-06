@@ -65,6 +65,7 @@ export default function NotificationsPage() {
   const [targetMsg, setTargetMsg] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
+  const [clearedNotifIds, setClearedNotifIds] = useState([]);
   const fileInputRef = useRef(null);
   const replyFileInputRef = useRef(null);
   
@@ -75,6 +76,14 @@ export default function NotificationsPage() {
   const { data: sentNotifications = [] } = useSentNotifications();
   const { data: users = [] } = useRecipients();
 
+  // Load cleared notification IDs from localStorage on mount
+  useEffect(() => {
+    if (currentUser) {
+      const saved = localStorage.getItem(`cleared_inbox_notifications_${currentUser._id || currentUser.id}`);
+      setClearedNotifIds(saved ? JSON.parse(saved) : []);
+    }
+  }, [currentUser]);
+
   const [recipientRole, setRecipientRole] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState("");
   const [newMsgSubject, setNewMsgSubject] = useState("");
@@ -82,8 +91,9 @@ export default function NotificationsPage() {
 
   const displayList = useMemo(() => {
     if (activeTab === "sent") return sentNotifications;
-    return notifications;
-  }, [activeTab, notifications, sentNotifications]);
+    // Filter out cleared notification IDs from inbox view
+    return notifications.filter(n => !clearedNotifIds.includes(n._id));
+  }, [activeTab, notifications, sentNotifications, clearedNotifIds]);
 
   const filteredNotifications = useMemo(() => {
     return displayList.filter(n => {
@@ -126,15 +136,18 @@ export default function NotificationsPage() {
     setClearAllConfirmOpen(true);
   };
 
-  const executeClearAll = async () => {
-    try {
-      await api.delete('/notifications');
-      toast.success("All notifications cleared");
-      setClearAllConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    } catch (err) {
-      toast.error("Failed to clear notifications");
+  const executeClearAll = () => {
+    // Frontend-only clear: store cleared IDs in localStorage
+    const idsToClear = notifications
+      .filter(n => n.status !== 'archived')
+      .map(n => n._id);
+    const updated = [...new Set([...clearedNotifIds, ...idsToClear])];
+    setClearedNotifIds(updated);
+    if (currentUser) {
+      localStorage.setItem(`cleared_inbox_notifications_${currentUser._id || currentUser.id}`, JSON.stringify(updated));
     }
+    toast.success("Inbox cleared from view (frontend only)");
+    setClearAllConfirmOpen(false);
   };
 
   const handleDownload = async (path) => {
@@ -541,14 +554,14 @@ export default function NotificationsPage() {
               <Trash2 className="w-8 h-8 text-white" />
             </div>
             <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Communications</DialogTitle>
-            <DialogDescription className="text-white/80 mt-1">This will permanently clear your inbox.</DialogDescription>
+            <DialogDescription className="text-white/80 mt-1">This will hide your inbox messages from view.</DialogDescription>
           </div>
           <div className="p-8">
             <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
-              Are you sure you want to permanently clear ALL notifications?
+              Are you sure you want to clear your inbox view?
             </p>
             <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
-              This action is permanent and cannot be undone. All messages, official alerts, and archived items will be cleared.
+              This is a frontend-only action. Your messages remain in the database and will no longer appear in your inbox on this device. Sent messages and archived items are unaffected.
             </p>
           </div>
           <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">

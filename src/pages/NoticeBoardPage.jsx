@@ -29,6 +29,7 @@ export default function NoticeBoardPage() {
   const { data: notices = [] } = usePublicNotices();
 
   const [config, setConfig] = useState(null);
+  const [clearedNoticeIds, setClearedNoticeIds] = useState([]);
 
   useEffect(() => {
     api.get('/config')
@@ -37,6 +38,14 @@ export default function NoticeBoardPage() {
       })
       .catch(err => console.warn("Failed to load config:", err));
   }, []);
+
+  // Load cleared notice IDs from localStorage
+  useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`cleared_public_notices_${user._id || user.id}`);
+      setClearedNoticeIds(saved ? JSON.parse(saved) : []);
+    }
+  }, [user]);
 
   // ─── UI state ─────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,29 +61,30 @@ export default function NoticeBoardPage() {
     setClearNoticesConfirmOpen(true);
   };
 
-  const executeClearAllNotices = async () => {
-    try {
-      const res = await api.delete('/transfer/public-notices');
-      if (res.data.success) {
-        toast.success(res.data.message || "All public notices cleared successfully!");
-        setClearNoticesConfirmOpen(false);
-        queryClient.invalidateQueries({ queryKey: ['transfers', 'public-notices'] });
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to clear public notices");
+  const executeClearAllNotices = () => {
+    // Frontend-only clear: store cleared notice IDs in localStorage
+    const idsToClear = notices.map(n => n._id);
+    const updated = [...new Set([...clearedNoticeIds, ...idsToClear])];
+    setClearedNoticeIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_public_notices_${user._id || user.id}`, JSON.stringify(updated));
     }
+    toast.success("Public notices cleared from view (frontend only)");
+    setClearNoticesConfirmOpen(false);
   };
 
   const filteredNotices = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return notices.filter(n => {
-      const title = `Public Notice: Plot ${n.plot.landCode}`;
-      const location = n.plot.location;
-      const matchesSearch = !q || title.toLowerCase().includes(q) || n.plot.landCode.toLowerCase().includes(q) || location.toLowerCase().includes(q);
-      const matchesRegion = regionFilter === "All" || location.toLowerCase().includes(regionFilter.toLowerCase());
-      return matchesSearch && matchesRegion;
-    });
-  }, [searchQuery, regionFilter, notices]);
+    return notices
+      .filter(n => !clearedNoticeIds.includes(n._id))
+      .filter(n => {
+        const title = `Public Notice: Plot ${n.plot.landCode}`;
+        const location = n.plot.location;
+        const matchesSearch = !q || title.toLowerCase().includes(q) || n.plot.landCode.toLowerCase().includes(q) || location.toLowerCase().includes(q);
+        const matchesRegion = regionFilter === "All" || location.toLowerCase().includes(regionFilter.toLowerCase());
+        return matchesSearch && matchesRegion;
+      });
+  }, [searchQuery, regionFilter, notices, clearedNoticeIds]);
 
   const openObjection = (notice) => {
     setSelectedNotice(notice);
@@ -334,10 +344,10 @@ export default function NoticeBoardPage() {
           </div>
           <div className="p-8">
             <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
-              Are you sure you want to clear ALL public notices from the database?
+              Are you sure you want to clear all public notices from your view?
             </p>
             <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
-              This action is permanent and cannot be undone. All active and expired notices will be permanently deleted from the secure database.
+              This is a frontend-only action on this device. Public notices and their underlying land transfer records will remain intact in the backend database.
             </p>
           </div>
           <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">

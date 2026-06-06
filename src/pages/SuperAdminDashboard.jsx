@@ -21,7 +21,7 @@ import {
   DialogDescription,
   DialogFooter 
 } from "../app/components/ui/dialog";
-import { mockActivityLogs } from "../data/mockData";
+
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAllUsers } from "../hooks/useAdminData";
 import { useLandPlots } from "../hooks/useLandData";
@@ -123,16 +123,28 @@ export default function SuperAdminDashboard() {
   };
 
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
+  const [clearedNotifIds, setClearedNotifIds] = useState([]);
 
-  const executeClearAllNotif = async () => {
-    try {
-      await api.delete('/notifications');
-      toast.success("All system notifications cleared successfully");
-      setClearAllConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    } catch (err) {
-      toast.error("Failed to clear notifications");
+  useEffect(() => {
+    if (user) {
+      const saved = localStorage.getItem(`cleared_admin_notifications_${user._id || user.id}`);
+      setClearedNotifIds(saved ? JSON.parse(saved) : []);
     }
+  }, [user]);
+
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter(n => !clearedNotifIds.includes(n._id));
+  }, [notifications, clearedNotifIds]);
+
+  const executeClearAllNotif = () => {
+    const idsToClear = visibleNotifications.map(n => n._id);
+    const updated = [...new Set([...clearedNotifIds, ...idsToClear])];
+    setClearedNotifIds(updated);
+    if (user) {
+      localStorage.setItem(`cleared_admin_notifications_${user._id || user.id}`, JSON.stringify(updated));
+    }
+    setClearAllConfirmOpen(false);
+    toast.success("System notifications cleared from view (frontend only)");
   };
 
   const [clearedLogIds, setClearedLogIds] = useState([]);
@@ -320,12 +332,12 @@ export default function SuperAdminDashboard() {
                   System Notifications
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  {notifications.filter(n => n.status === 'unread').length > 0 && (
+                  {visibleNotifications.filter(n => n.status === 'unread').length > 0 && (
                     <Badge className="bg-red-500 text-white animate-pulse">
-                      {notifications.filter(n => n.status === 'unread').length} New
+                      {visibleNotifications.filter(n => n.status === 'unread').length} New
                     </Badge>
                   )}
-                  {notifications.length > 0 && (
+                  {visibleNotifications.length > 0 && (
                     <Button 
                       variant="ghost" 
                       onClick={() => setClearAllConfirmOpen(true)}
@@ -339,8 +351,8 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border/50 max-h-[350px] overflow-y-auto custom-scrollbar">
-                {notifications.length > 0 ? (
-                  notifications.map((n) => (
+                {visibleNotifications.length > 0 ? (
+                  visibleNotifications.map((n) => (
                     <div key={n._id} className={cn(
                       "p-4 hover:bg-accent/30 transition-colors group relative",
                       n.status === 'unread' ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""
@@ -401,31 +413,42 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent className="pt-4">
               <div className="space-y-4">
-                {(visibleLogs.length > 0 ? (showAllLogs ? visibleLogs : visibleLogs.slice(0, 8)) : (showAllLogs ? mockActivityLogs : mockActivityLogs.slice(0, 4))).map((log) => {
-                  const logTime = log.timestamp 
-                    ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                    : (log.time?.split(" ")[1] || "");
-                  return (
-                    <div key={log.id || log._id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
-                      <div className={cn(
-                        "w-1 rounded-full shrink-0 h-12",
-                        log.success || log.status === "success" ? "bg-emerald-500" : "bg-red-400"
-                      )} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold truncate text-foreground">{log.description || log.action}</p>
-                        <p className="text-[10px] text-muted-foreground">{log.userName || log.user} · {log.userRole || log.role}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono">{log.ip} · {logTime}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                <Button 
-                  variant="outline" 
-                  className="w-full text-xs font-bold uppercase tracking-widest gap-2"
-                  onClick={() => setShowAllLogs(!showAllLogs)}
-                >
-                  {showAllLogs ? "View Less" : "View More"} <ArrowUpRight className={`w-3 h-3 transition-transform ${showAllLogs ? "rotate-180" : ""}`} />
-                </Button>
+                {visibleLogs.length > 0 ? (
+                  <>
+                    {(showAllLogs ? visibleLogs : visibleLogs.slice(0, 8)).map((log) => {
+                      const logTime = log.timestamp 
+                        ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                        : (log.time?.split(" ")[1] || "");
+                      return (
+                        <div key={log.id || log._id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
+                          <div className={cn(
+                            "w-1 rounded-full shrink-0 h-12",
+                            log.success || log.status === "success" ? "bg-emerald-500" : "bg-red-400"
+                          )} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold truncate text-foreground">{log.description || log.action}</p>
+                            <p className="text-[10px] text-muted-foreground">{log.userName || log.user} · {log.userRole || log.role}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{log.ip} · {logTime}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {visibleLogs.length > 8 && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full text-xs font-bold uppercase tracking-widest gap-2"
+                        onClick={() => setShowAllLogs(!showAllLogs)}
+                      >
+                        {showAllLogs ? "View Less" : "View More"} <ArrowUpRight className={`w-3 h-3 transition-transform ${showAllLogs ? "rotate-180" : ""}`} />
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs font-medium">No activity logs recorded</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -449,14 +472,14 @@ export default function SuperAdminDashboard() {
               <Trash2 className="w-8 h-8 text-white" />
             </div>
             <DialogTitle className="text-2xl font-bold font-['Syne']">Clear Alerts Registry</DialogTitle>
-            <DialogDescription className="text-white/80 mt-1">This will permanently clear all system alerts.</DialogDescription>
+            <DialogDescription className="text-white/80 mt-1">This will hide all system alerts from this view.</DialogDescription>
           </div>
           <div className="p-8">
             <p className="text-center text-gray-600 dark:text-gray-300 font-medium">
-              Are you sure you want to permanently clear ALL system alerts?
+              Are you sure you want to clear all system alerts from your view?
             </p>
             <p className="text-center text-xs text-muted-foreground mt-2 px-4 dark:text-gray-400">
-              This action is permanent and cannot be undone. All system notifications and alerts will be permanently deleted from the database.
+              This is a frontend-only action. System notifications and alerts will remain in the backend database and will be hidden from view on this device only.
             </p>
           </div>
           <DialogFooter className="p-6 bg-muted/30 border-t flex gap-3">

@@ -5,7 +5,7 @@ import api from "../utils/api";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const { user, token, setAuth, clearAuth, updateUser } = useAuthStore();
+    const { user, token, hasHydrated, setAuth, clearAuth, updateUser } = useAuthStore();
 
     const fetchUser = async () => {
         try {
@@ -35,7 +35,9 @@ export const AuthProvider = ({ children }) => {
         <AuthContext.Provider value={{ 
             user, 
             token,
-            loading: false, // Instant dashboard experience, no loading screens!
+            // loading is true until Zustand has finished rehydrating from localStorage.
+            // AppLayout's auth guard waits for this before deciding to redirect.
+            loading: !hasHydrated,
             setUser: (u) => setAuth(token, u), 
             refreshUser: fetchUser, 
             updateUser,

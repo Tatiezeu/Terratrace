@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
@@ -51,8 +51,15 @@ const REGION_CODES = [
 ];
 
 export default function ClientDashboard() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
+
+  // Refresh user profile if they are a Client to check if they have been upgraded to Landowner
+  useEffect(() => {
+    if (user && user.role === 'Client') {
+      refreshUser();
+    }
+  }, []);
 
   // ─── Server state via TanStack Query (cached, deduped, stale-while-revalidate) ───
   const { data: plots = [], isFetching: plotsFetching } = useLandPlots();

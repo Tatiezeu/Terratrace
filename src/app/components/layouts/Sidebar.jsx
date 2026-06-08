@@ -39,7 +39,7 @@ const navItems = [
     label: "My Land Plots",
     icon: <MapPin className="w-5 h-5" />,
     path: "/dashboard/my-land-plots",
-    roles: ["Landowner", "SuperAdmin"],
+    roles: ["Client", "Landowner", "SuperAdmin"],
   },
   {
     label: "Track Applications",

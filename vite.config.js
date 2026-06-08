@@ -9,6 +9,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    host: true,   // bind to 0.0.0.0 so LAN IP links (e.g. from email) are reachable
     open: true,
   },
 })

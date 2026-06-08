@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
@@ -11,14 +11,22 @@ export default function MyLandPlotsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // Refresh user profile if they are a Client to check if they have been upgraded to Landowner
+  useEffect(() => {
+    if (user && user.role === 'Client') {
+      refreshUser();
+    }
+  }, []);
 
   // ─── Server state via TanStack Query (cached, deduped) ────────────────────
   const { data: plots = [] } = useMyLandPlots();
 
   // Filter based on land code owner segment as requested
   const myPlots = useMemo(() => {
-    if (!user) return plots;
+    if (!user) return [];
+    if (user.role === 'Client') return [];
     
     // If SuperAdmin, they should also see State Land (ownerId 00000)
     const isSuperAdmin = user.role === 'SuperAdmin';

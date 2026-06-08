@@ -7,10 +7,12 @@ import logoSvg from "../assets/logo.svg";
 import { Button } from "../app/components/ui/button";
 import { Input } from "../app/components/ui/input";
 import { toast } from "sonner";
+import { useAuthStore } from "../store/authStore";
 
 export default function EmailVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setAuth } = useAuthStore();
   const queryParams = new URLSearchParams(location.search);
   const reason = queryParams.get("reason"); // '2fa' or null (for registration)
 
@@ -57,8 +59,7 @@ export default function EmailVerificationPage() {
 
             if (reason === "2fa") {
               const userData = response.data.data?.user || response.data.data;
-              localStorage.setItem('token', response.data.token);
-              localStorage.setItem('user', JSON.stringify(userData));
+              setAuth(response.data.token, userData);
               setWelcomeUserName(userData?.firstName || "Officer");
               setShow2faWelcome(true);
               setTimeout(() => {
@@ -126,8 +127,7 @@ export default function EmailVerificationPage() {
 
         if (reason === "2fa") {
           const userData = response.data.data?.user || response.data.data;
-          localStorage.setItem('token', response.data.token);
-          localStorage.setItem('user', JSON.stringify(userData));
+          setAuth(response.data.token, userData);
           setWelcomeUserName(userData?.firstName || "Officer");
           setShow2faWelcome(true);
           setTimeout(() => {

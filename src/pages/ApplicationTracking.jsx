@@ -219,7 +219,7 @@ export default function ApplicationTracking() {
   // Get customized header title and description based on current logged in user's role
   const getHeaderDetails = () => {
     switch (user?.role) {
-      case 'SuperAdmin':
+      case 'Admin':
         return {
           title: "National Title Registry Monitor",
           desc: "Oversee all global land deeds, public notices, and blockchain registries across all regions."
@@ -251,7 +251,7 @@ export default function ApplicationTracking() {
 
   // Get customized statistics labels based on current logged in user's role
   const getStatsLabels = () => {
-    const isOfficer = ['LRO', 'Notary', 'SuperAdmin'].includes(user?.role);
+    const isOfficer = ['LRO', 'Notary', 'Admin'].includes(user?.role);
     return {
       total: isOfficer ? "Total Active Cases" : "Your Applications",
       pending: user?.role === 'Notary' ? "Awaiting Your Audit" : "Notary Audits",

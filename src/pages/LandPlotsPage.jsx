@@ -33,6 +33,7 @@ export default function LandPlotsPage() {
   // ─── UI state ─────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("All");
+  const [filterOwner, setFilterOwner] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,22 +51,48 @@ export default function LandPlotsPage() {
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
       const q = searchQuery.toLowerCase();
+      
+      // Extract owner name
+      let ownerName = "";
+      if (plot.owner) {
+        if (typeof plot.owner === "object") {
+          ownerName = `${plot.owner.firstName || ""} ${plot.owner.lastName || ""}`.trim();
+        } else if (typeof plot.owner === "string") {
+          ownerName = plot.owner;
+        }
+      }
+      
+      // Extract owner ID
+      let ownerId = "";
+      if (plot.owner && typeof plot.owner === "object") {
+        ownerId = plot.owner._id || plot.owner.id || "";
+      } else if (plot.owner && typeof plot.owner === "string" && plot.owner.match(/^[0-9a-fA-F]{24}$/)) {
+        ownerId = plot.owner;
+      }
+
       const matchesSearch =
         !q ||
         plot.landCode.toLowerCase().includes(q) ||
         plot.location.toLowerCase().includes(q) ||
-        (plot.landType === '00050' ? 'government of cameroon'.includes(q) : (plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}`.toLowerCase().includes(q) : false));
+        ownerName.toLowerCase().includes(q) ||
+        (ownerId && ownerId.toLowerCase().includes(q)) ||
+        (plot.landCode.split("-")[2]?.toLowerCase().includes(q));
 
       const matchesLocation =
         selectedLocation === "All" ||
-        plot.location.includes(selectedLocation);
+        plot.location.toLowerCase().includes(selectedLocation.toLowerCase());
 
       const matchesPrice =
         plot.price >= priceRange[0] && plot.price <= priceRange[1];
 
-      return matchesSearch && matchesLocation && matchesPrice;
+      const matchesOwner =
+        !filterOwner ||
+        ownerName.toLowerCase().includes(filterOwner.toLowerCase()) ||
+        (ownerId && ownerId.toLowerCase().includes(filterOwner.toLowerCase()));
+
+      return matchesSearch && matchesLocation && matchesPrice && matchesOwner;
     });
-  }, [searchQuery, selectedLocation, priceRange, plots]);
+  }, [searchQuery, selectedLocation, priceRange, filterOwner, plots]);
 
   const ALL_LOCATIONS = useMemo(() => ["All", ...new Set(plots.map((p) => p.location.split(",")[1]?.trim() || p.location))], [plots]);
   const MAX_PRICE = useMemo(() => plots.length > 0 ? Math.max(...plots.map((p) => p.price)) : 100000000, [plots]);
@@ -73,12 +100,14 @@ export default function LandPlotsPage() {
 
   const activeFilterCount =
     (selectedLocation !== "All" ? 1 : 0) +
-    (priceRange[0] !== MIN_PRICE || priceRange[1] !== MAX_PRICE ? 1 : 0);
+    (priceRange[0] !== MIN_PRICE || priceRange[1] !== MAX_PRICE ? 1 : 0) +
+    (filterOwner.trim() !== "" ? 1 : 0);
 
   const clearFilters = () => {
     setSelectedLocation("All");
     setPriceRange([MIN_PRICE, MAX_PRICE]);
     setSearchQuery("");
+    setFilterOwner("");
   };
 
   const handleSeeMore = (plot) => {
@@ -243,6 +272,32 @@ export default function LandPlotsPage() {
                     </div>
                   </div>
                 </div>
+                
+                {/* Additional Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                      Owner Name or ID
+                    </p>
+                    <Input
+                      placeholder="Enter owner name or ID..."
+                      value={filterOwner}
+                      onChange={(e) => setFilterOwner(e.target.value)}
+                      className="h-10 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+                      Plot Number / Land Code
+                    </p>
+                    <Input
+                      placeholder="Enter land code..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="h-10 rounded-xl"
+                    />
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -268,8 +323,21 @@ export default function LandPlotsPage() {
 
       {/* Grid */}
       {loading ? (
-        <div className="py-20">
-          <SpinnerLoader className="scale-150" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm p-4 space-y-4">
+              <div className="h-56 bg-muted rounded-lg animate-pulse" />
+              <div className="space-y-3">
+                <div className="h-5 w-1/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-2/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-1/2 bg-muted rounded-md animate-pulse" />
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

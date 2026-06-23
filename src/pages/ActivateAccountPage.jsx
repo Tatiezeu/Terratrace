@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
-import { ShieldCheck, ShieldAlert, ArrowRight, Loader2 } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ArrowRight, Loader2, Lock, Eye, EyeOff, KeyRound } from "lucide-react";
 import api from "../utils/api";
 import { Button } from "../app/components/ui/button";
 import { toast } from "sonner";
@@ -10,8 +10,10 @@ export default function ActivateAccountPage() {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const token = queryParams.get("token");
+  const type = queryParams.get("type");
+  const isResetMode = type === "reset";
 
-  const [status, setStatus] = useState("loading"); // 'loading', 'success', 'error'
+  const [status, setStatus] = useState("loading"); // 'loading', 'success', 'error', 'reset_form', 'reset_success'
   const [errorMessage, setErrorMessage] = useState("");
   const requestInitiated = useRef(false);
 
@@ -19,6 +21,13 @@ export default function ActivateAccountPage() {
   const [resendEmail, setResendEmail] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
   const [resending, setResending] = useState(false);
+
+  // Reset Password states
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [submittingReset, setSubmittingReset] = useState(false);
 
   useEffect(() => {
     let interval;
@@ -55,6 +64,11 @@ export default function ActivateAccountPage() {
   };
 
   useEffect(() => {
+    if (isResetMode) {
+      setStatus("reset_form");
+      return;
+    }
+
     if (!token) {
       setStatus("error");
       setErrorMessage("No activation token was provided in the link. Please check your email and click the link again.");
@@ -83,7 +97,67 @@ export default function ActivateAccountPage() {
     };
 
     activateAccount();
-  }, [token]);
+  }, [token, isResetMode]);
+
+  const getPasswordStrength = (pass) => {
+    let strength = 0;
+    if (pass.length >= 6) strength += 25;
+    if (/[A-Z]/.test(pass)) strength += 25;
+    if (/[0-9]/.test(pass)) strength += 25;
+    if (/[^A-Za-z0-9]/.test(pass)) strength += 25;
+    return strength;
+  };
+
+  const getStrengthColor = (strength) => {
+    if (strength <= 25) return "bg-red-500";
+    if (strength <= 50) return "bg-orange-500";
+    if (strength <= 75) return "bg-yellow-500";
+    return "bg-emerald-500";
+  };
+
+  const getStrengthText = (strength) => {
+    if (strength === 0) return "VERY WEAK";
+    if (strength <= 25) return "WEAK";
+    if (strength <= 50) return "FAIR";
+    if (strength <= 75) return "GOOD";
+    return "STRONG";
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Match Conformity Failed", {
+        description: "Confirm password does not match the new password."
+      });
+      return;
+    }
+    if (getPasswordStrength(newPassword) < 50) {
+      toast.error("Weak Password Strength", {
+        description: "Please choose a stronger password matching the complexity requirements."
+      });
+      return;
+    }
+
+    setSubmittingReset(true);
+    try {
+      const response = await api.post("/auth/reset-password", {
+        token,
+        password: newPassword
+      });
+      if (response.data.success) {
+        toast.success("Password updated successfully!", {
+          description: "You can now log in with your new password."
+        });
+        setStatus("reset_success");
+      }
+    } catch (err) {
+      toast.error("Password reset failed", {
+        description: err.response?.data?.message || "Invalid or expired reset token."
+      });
+    } finally {
+      setSubmittingReset(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#001833] flex flex-col items-center justify-center p-6 relative overflow-hidden">
@@ -227,6 +301,163 @@ export default function ActivateAccountPage() {
                 </Button>
               </form>
             </div>
+          </div>
+        )}
+
+        {/* Reset Password Form State */}
+        {status === "reset_form" && (
+          <form onSubmit={handleResetPassword} className="space-y-6 w-full flex flex-col items-center">
+            <div className="flex flex-col items-center gap-2 mb-2">
+              <div className="w-14 h-14 bg-yellow-500/10 border border-yellow-500/20 rounded-full flex items-center justify-center shadow-lg">
+                <KeyRound className="w-6 h-6 text-[#D4AF37]" />
+              </div>
+              <h3 className="text-xl font-bold text-white font-['Syne']">Reset Portal Password</h3>
+              <p className="text-gray-400 text-xs max-w-xs">
+                Update your security credentials for the digital land registry.
+              </p>
+            </div>
+
+            {/* New Password input */}
+            <div className="space-y-2 text-left w-full">
+              <label htmlFor="newPassword" className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">New Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  id="newPassword"
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="w-full pl-11 pr-11 h-12 rounded-xl bg-white/5 border border-white/10 font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37] text-sm" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              
+              {newPassword && (
+                <div className="px-1 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                     <span>Strength</span>
+                     <span className={getPasswordStrength(newPassword) >= 75 ? "text-emerald-400" : "text-amber-400"}>
+                       {getStrengthText(getPasswordStrength(newPassword))} ({getPasswordStrength(newPassword)}%)
+                     </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${getPasswordStrength(newPassword)}%` }}
+                      className={`h-full ${getStrengthColor(getPasswordStrength(newPassword))} transition-all duration-300`}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Confirm Password input */}
+            <div className="space-y-2 text-left w-full">
+              <label htmlFor="confirmPassword" className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Confirm Password</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="w-full pl-11 pr-11 h-12 rounded-xl bg-white/5 border border-white/10 font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#D4AF37] text-sm" 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              
+              {confirmPassword && (
+                <div className="px-1 space-y-1">
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                     <span>Conformity</span>
+                     <span className={newPassword === confirmPassword ? "text-emerald-400" : "text-red-400"}>
+                       {newPassword === confirmPassword ? "MATCHED" : "MISMATCH"}
+                     </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: newPassword === confirmPassword ? "100%" : "30%" }}
+                      className={`h-full ${newPassword === confirmPassword ? "bg-emerald-500" : "bg-red-400"} transition-all duration-300`}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={submittingReset || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+              className={`w-full font-extrabold h-12 rounded-xl flex items-center justify-center gap-2 transition-all duration-300 ${
+                newPassword && confirmPassword && newPassword === confirmPassword && getPasswordStrength(newPassword) >= 50
+                  ? "bg-gradient-to-r from-[#D4AF37] to-[#F4C430] text-[#002147] hover:from-[#e3bd42] hover:to-[#ffd64a]"
+                  : "bg-white/10 text-white/40 border border-white/5 cursor-not-allowed"
+              }`}
+            >
+              {submittingReset ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  Update Password
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+            
+            <Button
+              asChild
+              variant="link"
+              className="text-gray-400 hover:text-white text-xs font-semibold mt-2"
+            >
+              <Link to="/login">Cancel and Return</Link>
+            </Button>
+          </form>
+        )}
+
+        {/* Reset Success State */}
+        {status === "reset_success" && (
+          <div className="flex flex-col items-center">
+            <motion.div
+              initial={{ scale: 0.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              className="w-20 h-20 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20"
+            >
+              <ShieldCheck className="w-10 h-10 text-emerald-400" />
+            </motion.div>
+
+            <h3 className="text-2xl font-bold text-white mb-3 font-['Syne']">
+              Password Updated!
+            </h3>
+            <p className="text-gray-300 text-sm leading-relaxed mb-8 max-w-sm px-2">
+              Your password has been cryptographically updated in the registry. You can now access your dashboard.
+            </p>
+
+            <Button
+              asChild
+              className="w-full bg-gradient-to-r from-[#D4AF37] to-[#F4C430] hover:from-[#e3bd42] hover:to-[#ffd64a] text-[#002147] font-extrabold h-12 rounded-xl flex items-center justify-center gap-2 group transition-all duration-300 shadow-xl shadow-[#D4AF37]/15"
+            >
+              <Link to="/login">
+                Proceed to Sign In
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </Button>
           </div>
         )}
 

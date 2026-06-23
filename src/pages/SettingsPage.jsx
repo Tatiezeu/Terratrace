@@ -865,7 +865,7 @@ export default function SettingsPage() {
                 onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm"
               >
-                <option value="Super Admin">Super Admin</option>
+                <option value="Admin">Admin</option>
                 <option value="Notary">Notary</option>
                 <option value="LRO">LRO</option>
                 <option value="Landowner">Landowner</option>

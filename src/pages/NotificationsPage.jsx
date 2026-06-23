@@ -291,7 +291,7 @@ export default function NotificationsPage() {
                         <SelectItem value="LRO">Registry Officer</SelectItem>
                         <SelectItem value="Notary">Notary Officer</SelectItem>
                         <SelectItem value="Client">Client</SelectItem>
-                        <SelectItem value="SuperAdmin">Super Admin</SelectItem>
+                        <SelectItem value="Admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

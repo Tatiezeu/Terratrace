@@ -16,19 +16,12 @@ import { AlertCircle } from "lucide-react";
 
 import api from "../../../utils/api";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfig } from "../../../hooks/useConfig";
 
 export function PublishNoticeModal({ open, onClose, request }) {
   const queryClient = useQueryClient();
   const [publicationMessage, setPublicationMessage] = useState("The land in question is about to be transferred.");
-  const [config, setConfig] = useState(null);
-
-  useEffect(() => {
-    if (open) {
-      api.get('/config').then(res => {
-        if (res.data.success) setConfig(res.data.data);
-      });
-    }
-  }, [open]);
+  const { data: config = {} } = useConfig();
 
   const handleSubmit = async () => {
     try {

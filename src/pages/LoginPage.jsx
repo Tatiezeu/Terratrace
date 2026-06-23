@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../store/authStore";
+import { setCachedData } from "../utils/cache";
 import { logActivity } from "../utils/logger";
 import VisualCaptchaChallenge from "../app/components/shared/VisualCaptchaChallenge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../app/components/ui/dialog";
@@ -90,7 +91,7 @@ export default function LoginPage() {
     import("./MyLandPlotsPage").catch(() => null);
     import("./LRODashboard").catch(() => null);
     import("./NotaryDashboard").catch(() => null);
-    import("./SuperAdminDashboard").catch(() => null);
+    import("./AdminDashboard").catch(() => null);
   };
 
   // TanStack Query useMutation for zero-latency authentication
@@ -127,49 +128,62 @@ export default function LoginPage() {
           queryKey: ['profile'],
           queryFn: async () => {
             const res = await api.get('/users/me');
-            return res.data.data;
+            const data = res.data.data;
+            setCachedData('profile', data);
+            return data;
           }
         }),
         queryClient.prefetchQuery({
-          queryKey: ['my-transfers'],
+          queryKey: ['transfers'],
           queryFn: async () => {
             const res = await api.get('/transfer/my-transfers');
-            return res.data.data;
+            const data = res.data.data;
+            setCachedData('transfers', data);
+            return data;
           }
         }),
         queryClient.prefetchQuery({
           queryKey: ['land'],
           queryFn: async () => {
             const res = await api.get('/land');
-            return res.data.data;
+            const data = res.data.data;
+            setCachedData('land', data);
+            return data;
           }
         }),
         queryClient.prefetchQuery({
-          queryKey: ['settings_users'],
+          queryKey: ['users', 'all'],
           queryFn: async () => {
             const res = await api.get('/users');
-            return res.data.data;
+            const data = res.data.data;
+            setCachedData('users_all', data);
+            return data;
           }
         }),
         queryClient.prefetchQuery({
           queryKey: ['settings_config'],
           queryFn: async () => {
             const res = await api.get('/config');
-            return res.data.data;
+            const data = res.data.data;
+            setCachedData('settings_config', data);
+            return data;
           }
         })
       ];
 
-      // Execute queries in background concurrently
-      await Promise.all(prefetchPromises.map(p => p.catch(() => null)));
+      // Execute queries in background concurrently (fire-and-forget, do not block transition)
+      prefetchPromises.forEach(p => p.catch(() => null));
 
       // ACTION 3: Route instantly to preloaded dashboard
       setTimeout(() => {
         navigate("/dashboard");
-      }, 1500); // 1.5 seconds for visual overlay transitions
+      }, 1000); // 1.0 second for visual overlay transitions
     },
     onError: (err) => {
       console.error("Login failure:", err);
+      if (email) {
+        localStorage.setItem('failed_login_email', email);
+      }
       if (err.response?.status === 401 && err.response?.data?.message?.includes("not verified")) {
         localStorage.setItem('temp_email', email);
         toast.info("Verification Required", {
@@ -201,7 +215,7 @@ export default function LoginPage() {
     {
       icon: <Globe className="w-5 h-5 text-emerald-400" />,
       title: "Immutable Registry",
-      desc: "Powered by blockchain technology to ensure land records cannot be tampered with."
+      desc: "Powered by TerraTrace technology to ensure land records cannot be tampered with."
     },
     {
       icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
@@ -340,7 +354,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <Label htmlFor="password" className="text-xs font-bold text-[#002147] uppercase tracking-widest opacity-60">Password</Label>
-                  <button type="button" onClick={() => setShowForgotModal(true)} className="text-xs font-bold text-emerald-600 hover:text-emerald-700">Forgot password?</button>
+                  <button type="button" onClick={() => { setForgotEmail(email || localStorage.getItem('failed_login_email') || ""); setShowForgotModal(true); }} className="text-xs font-bold text-emerald-600 hover:text-emerald-700">Forgot password?</button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

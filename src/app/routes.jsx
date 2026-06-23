@@ -86,7 +86,7 @@ const LandPlotsPage = withSuspense(lazy(() => import("../pages/LandPlotsPage")))
 const MyLandPlotsPage = withSuspense(lazy(() => import("../pages/MyLandPlotsPage")));
 const LRODashboard = withSuspense(lazy(() => import("../pages/LRODashboard")));
 const NotaryDashboard = withSuspense(lazy(() => import("../pages/NotaryDashboard")));
-const SuperAdminDashboard = withSuspense(lazy(() => import("../pages/SuperAdminDashboard")));
+const AdminDashboard = withSuspense(lazy(() => import("../pages/AdminDashboard")));
 const NoticeBoardPage = withSuspense(lazy(() => import("../pages/NoticeBoardPage")));
 const ProfilePage = withSuspense(lazy(() => import("../pages/ProfilePage")));
 const NotificationsPage = withSuspense(lazy(() => import("../pages/NotificationsPage")));
@@ -135,7 +135,7 @@ export const router = createBrowserRouter([
       { path: "my-land-plots", Component: MyLandPlotsPage },
       { path: "lro", Component: LRODashboard },
       { path: "notary", Component: NotaryDashboard },
-      { path: "admin", Component: SuperAdminDashboard },
+      { path: "admin", Component: AdminDashboard },
       { path: "notices", Component: NoticeBoardPage },
       { path: "profile", Component: ProfilePage },
       { path: "notifications", Component: NotificationsPage },

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { getCachedData, setCachedData } from '../utils/cache';
 
 /**
  * useProfile - Centralized hook to fetch user profile data.
@@ -14,7 +15,17 @@ export const useProfile = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch profile data');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('profile', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('profile');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('profile');
+      return cached?.timestamp;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes cache stale time
     refetchOnWindowFocus: false,
@@ -139,6 +150,7 @@ export const useUpdateProfile = () => {
       // Force immediate cache invalidation so ProfilePage re-fetches fresh data
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.setQueryData(['profile'], updatedUser);
+      setCachedData('profile', updatedUser);
 
       // Instantly synchronize top navigation layout state without waiting for refetch
       updateUser(updatedUser);

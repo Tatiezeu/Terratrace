@@ -53,10 +53,10 @@ export function RegisterLandownerModal({ open, onClose }) {
 
   useEffect(() => {
     if (open) {
-      api.get('/users')
+      api.get('/users/recipients')
         .then(res => {
           if (res.data.success) {
-            setExistingOwners(res.data.data.filter(u => u.role === 'Landowner'));
+            setExistingOwners(res.data.data.filter(u => u.role === 'Landowner' || u.role === 'Client'));
             setNotaries(res.data.data.filter(u => u.role === 'Notary'));
           }
         })
@@ -96,7 +96,40 @@ export function RegisterLandownerModal({ open, onClose }) {
     return `${typeCode}-${regionCode}-${ownerIdSegment}-${plotNum}`;
   };
 
+  const validateForm = () => {
+    if (!formData.landType) return "Land Type is required";
+    if (!formData.region) return "Region is required";
+    if (!formData.plotSize) return "Plot Size is required";
+    if (!formData.matterportId) return "GPS Coordinates (Matterport ID) is required";
+    if (!formData.landStatus) return "Land Status is required";
+    if (!coverImage) return "Cover Page image is required";
+
+    if (formData.landType === "private") {
+      if (!formData.assignedNotary) return "Assigned Notary is required";
+      if (!formData.plotNumber) return "Plot Number is required";
+
+      if (useExistingOwner) {
+        if (!selectedOwnerId) return "Please select an existing landowner";
+      } else {
+        if (!formData.fullName.trim()) return "Full Name is required";
+        if (!formData.cni.trim()) return "CNI Number is required";
+        if (!formData.phone.trim()) return "Phone Number is required";
+        if (!formData.email.trim()) return "Email Address is required";
+        if (!formData.password.trim()) return "Password is required";
+      }
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
+    const errorMsg = validateForm();
+    if (errorMsg) {
+      toast.error("Form Incomplete", {
+        description: errorMsg,
+      });
+      return;
+    }
+
     const landCode = generateLandCode();
     
     try {

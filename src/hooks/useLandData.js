@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
+import { getCachedData, setCachedData } from '../utils/cache';
 
 /**
  * useLandPlots — Fetches all land plots from the registry.
@@ -14,7 +15,17 @@ export const useLandPlots = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch land plots');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('land', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('land');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('land');
+      return cached?.timestamp;
     },
     staleTime: 60 * 1000, // 60 seconds — plots don't change frequently
   });
@@ -33,7 +44,17 @@ export const useMyLandPlots = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch your land plots');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('land_my-plots', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('land_my-plots');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('land_my-plots');
+      return cached?.timestamp;
     },
     staleTime: 60 * 1000,
   });

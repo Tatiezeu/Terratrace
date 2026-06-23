@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../utils/api';
+import { getCachedData, setCachedData } from '../utils/cache';
 
 /**
  * useNotifications — Fetches inbox notifications for the current user.
@@ -14,7 +15,17 @@ export const useNotifications = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch notifications');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('notifications', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('notifications');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('notifications');
+      return cached?.timestamp;
     },
     staleTime: 30 * 1000, // 30 seconds — check frequently for new messages
   });
@@ -33,7 +44,17 @@ export const useSentNotifications = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch sent notifications');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('notifications_sent', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('notifications_sent');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('notifications_sent');
+      return cached?.timestamp;
     },
     staleTime: 60 * 1000,
   });
@@ -52,7 +73,17 @@ export const useRecipients = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch recipients');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('users_recipients', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('users_recipients');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('users_recipients');
+      return cached?.timestamp;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes — user list changes rarely
   });

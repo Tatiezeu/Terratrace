@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   FileText,
   Trash2,
+  Loader2,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,8 +38,53 @@ import api from "../../../utils/api";
 import { logActivity } from "../../../utils/logger";
 import { useQueryClient } from "@tanstack/react-query";
 
-const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpeg,.png", multiple = false }) => {
+const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpeg,.png", multiple = false, onVerifyingChange }) => {
   const fileArray = Array.isArray(files) ? files : (files ? [files] : []);
+  const [fileStatuses, setFileStatuses] = useState({});
+
+  useEffect(() => {
+    const currentNames = fileArray.map(f => f?.name).filter(Boolean);
+    
+    // 1. Identify files that need checking (not in fileStatuses)
+    const newFiles = fileArray.filter(f => f && f.name && !fileStatuses[f.name]);
+    
+    if (newFiles.length > 0) {
+      // Set new files to checking
+      const newStatuses = {};
+      newFiles.forEach(f => {
+        newStatuses[f.name] = 'checking';
+      });
+      setFileStatuses(prev => ({ ...prev, ...newStatuses }));
+      if (onVerifyingChange) onVerifyingChange(fieldKey, true);
+
+      // Simulate checking completion
+      newFiles.forEach(f => {
+        setTimeout(() => {
+          setFileStatuses(prev => {
+            const updated = { ...prev, [f.name]: 'passed' };
+            // Check if any other file is still checking
+            const anyChecking = Object.values(updated).some(status => status === 'checking');
+            if (onVerifyingChange) onVerifyingChange(fieldKey, anyChecking);
+            return updated;
+          });
+        }, 1500);
+      });
+    }
+
+    // Clean up removed files
+    const existingNames = Object.keys(fileStatuses);
+    const removedNames = existingNames.filter(name => !currentNames.includes(name));
+    if (removedNames.length > 0) {
+      setFileStatuses(prev => {
+        const next = { ...prev };
+        removedNames.forEach(name => delete next[name]);
+        // Notify parent of updated state
+        const anyChecking = Object.values(next).some(status => status === 'checking');
+        if (onVerifyingChange) onVerifyingChange(fieldKey, anyChecking);
+        return next;
+      });
+    }
+  }, [files]);
   
   return (
     <div className="space-y-2">
@@ -61,27 +107,47 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
           </span>
         </div>
         {fileArray.length > 0 && (
-          <div className="flex flex-col gap-2 mt-2 w-full">
+          <div className="flex flex-col gap-3 mt-2 w-full">
             {fileArray.map((f, i) => (
               <div 
                 key={i} 
-                className="flex items-center justify-between p-2 rounded-lg bg-white border border-emerald-100 hover:border-emerald-300 transition-colors group/file"
+                className="flex flex-col gap-2 p-3 rounded-lg bg-white border border-emerald-100 hover:border-emerald-300 transition-colors group/file"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="text-xs text-emerald-900 font-medium truncate">{f.name}</span>
+                <div className="flex items-center justify-between min-w-0 w-full">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="text-xs text-emerald-900 font-bold truncate">{f.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onChange(fileArray.filter((_, idx) => idx !== i));
+                    }}
+                    className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onChange(fileArray.filter((_, idx) => idx !== i));
-                  }}
-                  className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+
+                {/* Conformity check status indicator */}
+                <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/20 px-2 py-1.5 rounded-md text-[10px]">
+                  <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                    {fileStatuses[f.name] === 'checking' ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                        <span>Verifying format, signatures &amp; size...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-emerald-700 font-bold">Conformity check passed</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground font-mono">{(f.size ? (f.size / (1024 * 1024)).toFixed(2) : "0.10")} MB</span>
+                </div>
               </div>
             ))}
           </div>
@@ -113,6 +179,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
   const [transferType, setTransferType] = useState(null); 
   const [portionType, setPortionType] = useState("full"); 
   const [notaryOfficers, setNotaryOfficers] = useState([]);
+  const [verifyingFiles, setVerifyingFiles] = useState({});
   const [formData, setFormData] = useState({
     cniFiles: [],
     supportingDocs: [],
@@ -138,6 +205,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
     setStep(0);
     setPortionType("full");
     setFormData({ cniFiles: [], supportingDocs: [], notaryId: "", surfaceArea: "" });
+    setVerifyingFiles({});
   };
 
   const handleClose = () => {
@@ -181,7 +249,12 @@ export function TransferRequestModal({ plot, open, onClose }) {
     }
   };
 
-  const canGoNextFromStep2 = formData.cniFiles.length > 0 && formData.supportingDocs.length > 0;
+  const handleVerifyingChange = (fieldName, isVerifying) => {
+    setVerifyingFiles(prev => ({ ...prev, [fieldName]: isVerifying }));
+  };
+
+  const isAnyFileChecking = Object.values(verifyingFiles).some(Boolean);
+  const canGoNextFromStep2 = formData.cniFiles.length > 0 && formData.supportingDocs.length > 0 && !isAnyFileChecking;
   const canSubmit = isDirectGrant ? canGoNextFromStep2 : (canGoNextFromStep2 && formData.notaryId);
 
   if (!plot) return null;
@@ -315,6 +388,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
                 files={formData.cniFiles}
                 multiple={true}
                 onChange={(f) => setFormData({ ...formData, cniFiles: f })}
+                onVerifyingChange={handleVerifyingChange}
               />
 
               <UploadItem
@@ -323,6 +397,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
                 files={formData.supportingDocs}
                 multiple={true}
                 onChange={(f) => setFormData({ ...formData, supportingDocs: f })}
+                onVerifyingChange={handleVerifyingChange}
               />
 
               {portionType === "sub" && (

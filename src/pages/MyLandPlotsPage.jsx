@@ -21,20 +21,20 @@ export default function MyLandPlotsPage() {
   }, []);
 
   // ─── Server state via TanStack Query (cached, deduped) ────────────────────
-  const { data: plots = [] } = useMyLandPlots();
+  const { data: plots = [], isLoading } = useMyLandPlots();
 
   // Filter based on land code owner segment as requested
   const myPlots = useMemo(() => {
     if (!user) return [];
     if (user.role === 'Client') return [];
     
-    // If SuperAdmin, they should also see State Land (ownerId 00000)
-    const isSuperAdmin = user.role === 'SuperAdmin';
+    // If Admin, they should also see State Land (ownerId 00000)
+    const isAdmin = user.role === 'Admin';
     const ownerIdFromCNI = user.cniNumber ? user.cniNumber.slice(-5).padStart(5, '0') : null;
     
     return plots.filter(plot => {
       const plotOwnerId = plot.landCode.split('-')[2];
-      if (isSuperAdmin && plotOwnerId === '00000') return true;
+      if (isAdmin && plotOwnerId === '00000') return true;
       return plotOwnerId === ownerIdFromCNI;
     });
   }, [plots, user]);
@@ -59,21 +59,42 @@ export default function MyLandPlotsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {myPlots.map((plot) => (
-          <LandPlotCard
-            key={plot._id || plot.id}
-            plot={plot}
-            onSeeMore={handleSeeMore}
-            onInitiateTransfer={handleInitiateTransfer}
-          />
-        ))}
-      </div>
-
-      {myPlots.length === 0 && (
-        <div className="text-center py-20 bg-card border border-border rounded-2xl">
-          <p className="text-muted-foreground">You don't have any registered land plots yet.</p>
+      {isLoading && myPlots.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm p-4 space-y-4">
+              <div className="h-56 bg-muted rounded-lg animate-pulse" />
+              <div className="space-y-3">
+                <div className="h-5 w-1/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-2/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-1/2 bg-muted rounded-md animate-pulse" />
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+              </div>
+            </div>
+          ))}
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {myPlots.map((plot) => (
+              <LandPlotCard
+                key={plot._id || plot.id}
+                plot={plot}
+                onSeeMore={handleSeeMore}
+                onInitiateTransfer={handleInitiateTransfer}
+              />
+            ))}
+          </div>
+
+          {myPlots.length === 0 && (
+            <div className="text-center py-20 bg-card border border-border rounded-2xl">
+              <p className="text-muted-foreground">You don't have any registered land plots yet.</p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals */}

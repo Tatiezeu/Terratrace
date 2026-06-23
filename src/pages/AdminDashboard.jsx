@@ -28,7 +28,7 @@ import { useLandPlots } from "../hooks/useLandData";
 import { useNotifications } from "../hooks/useNotificationsData";
 import { useAuth } from "../context/AuthContext";
 
-export default function SuperAdminDashboard() {
+export default function AdminDashboard() {
   const { user } = useAuth();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [officerType, setOfficerType] = useState("lro");

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../utils/api';
+import { getCachedData, setCachedData } from '../utils/cache';
 
 /**
  * useMyTransfers — Fetches all transfer requests for the current user.
@@ -14,7 +15,17 @@ export const useMyTransfers = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch transfer requests');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('transfers', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('transfers');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('transfers');
+      return cached?.timestamp;
     },
     staleTime: 30 * 1000, // 30 seconds — transfers change more frequently
   });
@@ -33,7 +44,17 @@ export const usePublicNotices = () => {
       if (!response.data.success) {
         throw new Error('Failed to fetch public notices');
       }
-      return response.data.data;
+      const data = response.data.data;
+      setCachedData('transfers_public-notices', data);
+      return data;
+    },
+    initialData: () => {
+      const cached = getCachedData('transfers_public-notices');
+      return cached?.data;
+    },
+    initialDataUpdatedAt: () => {
+      const cached = getCachedData('transfers_public-notices');
+      return cached?.timestamp;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes — notices are semi-static
   });

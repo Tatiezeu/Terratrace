@@ -91,6 +91,12 @@ export const ServerStateProvider = ({ children }) => {
     }
   }, [cache, setQueryData, invalidateQuery]);
 
+  const clearCache = useCallback(() => {
+    setCache({});
+    setErrors({});
+    setLoading({});
+  }, []);
+
   return (
     <ServerStateContext.Provider value={{
       cache,
@@ -100,7 +106,8 @@ export const ServerStateProvider = ({ children }) => {
       fetchQuery,
       invalidateQuery,
       setQueryData,
-      optimisticUpdate
+      optimisticUpdate,
+      clearCache
     }}>
       {children}
     </ServerStateContext.Provider>
@@ -152,14 +159,10 @@ export const useServerQuery = (key, fetchFn) => {
     registerQuery(key, stableFetch);
   }, [key, stableFetch, registerQuery]);
 
-  // Initial fetch on component mount if key has no cached data yet
-  const hasFetchedRef = React.useRef(false);
+  // Fetch on component mount to keep cache fresh (stale-while-revalidate)
   React.useEffect(() => {
-    if (cache[key] === undefined && !hasFetchedRef.current) {
-      hasFetchedRef.current = true;
-      fetchQuery(key, stableFetch);
-    }
-  }, [key, cache, fetchQuery, stableFetch]);
+    fetchQuery(key, stableFetch).catch(() => {});
+  }, [key, stableFetch, fetchQuery]);
 
   return {
     data: cache[key],

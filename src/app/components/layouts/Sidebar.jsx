@@ -19,94 +19,217 @@ import {
 import { cn } from "../ui/utils";
 import { motion } from "motion/react";
 import Logo from "../shared/Logo";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../../../utils/api";
+import { useAllUsers } from "../../../hooks/useAdminData";
+import { setCachedData } from "../../../utils/cache";
 
 const navItems = [
   {
     label: "Dashboard",
     icon: <LayoutDashboard className="w-5 h-5" />,
     path: "/dashboard",
-    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
   {
     label: "Land Plots",
     icon: <Map className="w-5 h-5" />,
     path: "/dashboard/land-plots",
-    roles: ["Client", "Landowner", "SuperAdmin"],
+    roles: ["Client", "Landowner", "Admin"],
   },
   {
     label: "My Land Plots",
     icon: <MapPin className="w-5 h-5" />,
     path: "/dashboard/my-land-plots",
-    roles: ["Client", "Landowner", "SuperAdmin"],
+    roles: ["Client", "Landowner", "Admin"],
   },
   {
     label: "Track Applications",
     icon: <FileSearch className="w-5 h-5" />,
     path: "/dashboard/applications",
-    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
   {
     label: "Registry Officer",
     icon: <ShieldCheck className="w-5 h-5" />,
     path: "/dashboard/lro",
-    roles: ["LRO", "SuperAdmin"],
+    roles: ["LRO", "Admin"],
   },
   {
     label: "Notary Officer",
     icon: <FileCheck className="w-5 h-5" />,
     path: "/dashboard/notary",
-    roles: ["Notary", "SuperAdmin"],
+    roles: ["Notary", "Admin"],
   },
   {
     label: "Officer Management",
     icon: <Users className="w-5 h-5" />,
     path: "/dashboard/admin",
-    roles: ["SuperAdmin"],
+    roles: ["Admin"],
   },
   {
     label: "Notifications",
     icon: <Bell className="w-5 h-5" />,
     path: "/dashboard/notifications",
-    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
   {
     label: "Public Notices",
     icon: <Users className="w-5 h-5" />,
     path: "/dashboard/notices",
-    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
   {
     label: "Profile",
     icon: <UserIcon className="w-5 h-5" />,
     path: "/dashboard/profile",
-    roles: ["Client", "Landowner", "LRO", "Notary", "SuperAdmin"],
+    roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
   {
     label: "Settings",
     icon: <SettingsIcon className="w-5 h-5" />,
     path: "/dashboard/settings",
-    roles: ["SuperAdmin"],
+    roles: ["Admin"],
   },
 ];
 
 export function Sidebar({ user }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const isSuperAdmin = user?.role === "SuperAdmin";
+  const isAdmin = user?.role === "Admin";
 
-  const { data: allUsers = [], isLoading: isLoadingUsers } = useQuery({
-    queryKey: ['users', 'all'],
-    queryFn: async () => {
-      const response = await api.get('/users');
-      if (!response.data.success) throw new Error('Failed to fetch users');
-      return response.data.data;
-    },
-    enabled: isSuperAdmin,
-    staleTime: 60 * 1000,
+  const { data: allUsers = [], isLoading: isLoadingUsers } = useAllUsers({
+    enabled: isAdmin,
   });
+
+  const handlePrefetch = (path) => {
+    try {
+      if (path === "/dashboard") {
+        queryClient.prefetchQuery({
+          queryKey: ['profile'],
+          queryFn: async () => {
+            const res = await api.get('/users/me');
+            const data = res.data.data;
+            setCachedData('profile', data);
+            return data;
+          }
+        });
+        queryClient.prefetchQuery({
+          queryKey: ['transfers'],
+          queryFn: async () => {
+            const res = await api.get('/transfer/my-transfers');
+            const data = res.data.data;
+            setCachedData('transfers', data);
+            return data;
+          }
+        });
+        if (user?.role === 'Client' || user?.role === 'Landowner') {
+          queryClient.prefetchQuery({
+            queryKey: ['land', 'my-plots'],
+            queryFn: async () => {
+              const res = await api.get('/land/my-plots');
+              const data = res.data.data;
+              setCachedData('land_my-plots', data);
+              return data;
+            }
+          });
+        } else {
+          queryClient.prefetchQuery({
+            queryKey: ['land'],
+            queryFn: async () => {
+              const res = await api.get('/land');
+              const data = res.data.data;
+              setCachedData('land', data);
+              return data;
+            }
+          });
+        }
+      } else if (path === "/dashboard/land-plots") {
+        queryClient.prefetchQuery({
+          queryKey: ['land'],
+          queryFn: async () => {
+            const res = await api.get('/land');
+            const data = res.data.data;
+            setCachedData('land', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/my-land-plots") {
+        queryClient.prefetchQuery({
+          queryKey: ['land', 'my-plots'],
+          queryFn: async () => {
+            const res = await api.get('/land/my-plots');
+            const data = res.data.data;
+            setCachedData('land_my-plots', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/applications") {
+        queryClient.prefetchQuery({
+          queryKey: ['transfers'],
+          queryFn: async () => {
+            const res = await api.get('/transfer/my-transfers');
+            const data = res.data.data;
+            setCachedData('transfers', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/notices") {
+        queryClient.prefetchQuery({
+          queryKey: ['transfers', 'public-notices'],
+          queryFn: async () => {
+            const res = await api.get('/transfer/public-notices');
+            const data = res.data.data;
+            setCachedData('transfers_public-notices', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/notifications") {
+        queryClient.prefetchQuery({
+          queryKey: ['notifications'],
+          queryFn: async () => {
+            const res = await api.get('/notifications');
+            const data = res.data.data;
+            setCachedData('notifications', data);
+            return data;
+          }
+        });
+        queryClient.prefetchQuery({
+          queryKey: ['notifications', 'sent'],
+          queryFn: async () => {
+            const res = await api.get('/notifications/sent');
+            const data = res.data.data;
+            setCachedData('notifications_sent', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/profile") {
+        queryClient.prefetchQuery({
+          queryKey: ['profile'],
+          queryFn: async () => {
+            const res = await api.get('/users/me');
+            const data = res.data.data;
+            setCachedData('profile', data);
+            return data;
+          }
+        });
+      } else if (path === "/dashboard/admin") {
+        queryClient.prefetchQuery({
+          queryKey: ['users', 'all'],
+          queryFn: async () => {
+            const res = await api.get('/users');
+            const data = res.data.data;
+            setCachedData('users_all', data);
+            return data;
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("Failed to prefetch in sidebar:", err);
+    }
+  };
 
   const { data: activityLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['activity-logs'],
@@ -127,7 +250,7 @@ export function Sidebar({ user }) {
       const localLogsJson = localStorage.getItem('terratrace_activity_logs');
       return localLogsJson ? JSON.parse(localLogsJson) : [];
     },
-    enabled: isSuperAdmin,
+    enabled: isAdmin,
     staleTime: 5 * 1000,
   });
 
@@ -143,7 +266,7 @@ export function Sidebar({ user }) {
       Landowner: "Landowner",
       LRO: "Land Registry Officer",
       Notary: "Notary Officer",
-      SuperAdmin: "Super Administrator",
+      Admin: "Admin",
     };
     return roleNames[role] || role;
   };
@@ -180,7 +303,7 @@ export function Sidebar({ user }) {
           const isActive = location.pathname === item.path;
 
           return (
-            <Link key={item.path} to={item.path}>
+            <Link key={item.path} to={item.path} onMouseEnter={() => handlePrefetch(item.path)}>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -209,7 +332,7 @@ export function Sidebar({ user }) {
         })}
 
         {/* System Cards in Sidebar (for Admin only, or specifically on Settings page context) */}
-        {user.role === "SuperAdmin" && (() => {
+        {user.role === "Admin" && (() => {
           const nodesCount = isLoadingUsers ? 4 : allUsers.filter(u => u.role === 'LRO' || u.role === 'Notary').length;
           const activeCount = isLoadingUsers ? 142 : allUsers.filter(u => u.status === 'active').length;
           const suspendedCount = isLoadingUsers ? 12 : allUsers.filter(u => u.status === 'suspended').length;

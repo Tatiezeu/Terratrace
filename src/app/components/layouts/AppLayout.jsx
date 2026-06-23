@@ -7,11 +7,13 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { GlobalLoadingBar } from "../shared/GlobalLoadingBar";
 import { logActivity } from "../../../utils/logger";
+import { useServerState } from "../../../context/ServerStateContext";
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const { user: rawUser, loading, updateUser, clearAuth } = useAuth();
   const queryClient = useQueryClient();
+  const { clearCache } = useServerState();
 
   const user = useMemo(() => {
     if (!rawUser) {
@@ -78,6 +80,8 @@ export default function AppLayout() {
     if (rawUser) {
       logActivity('Auth', `User '${rawUser.firstName} ${rawUser.lastName}' logged out`);
     }
+    // Clear custom ServerStateContext cache
+    clearCache();
     // Clear React Query cache first to wipe sensitive data
     queryClient.clear();
     // Clear auth state (Zustand + localStorage)

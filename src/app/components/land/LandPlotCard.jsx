@@ -59,14 +59,14 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
   const isOwner = user && (
     plot.owner?._id === user._id || 
     plot.owner === user._id || 
-    (user.role === 'SuperAdmin' && plot.landCode?.split('-')[2] === '00000')
+    (user.role === 'Admin' && plot.landCode?.split('-')[2] === '00000')
   );
   const isPublic = plot.landType === "00050";
 
   const handleUnblockRequest = () => {
     api.post('/notifications/unblock-request', { plotId: plot._id, plotCode: plot.landCode })
       .then(() => {
-        toast.success("Request sent to Super Admin");
+        toast.success("Request sent to Admin");
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         queryClient.invalidateQueries({ queryKey: ['transfers'] });
       })
@@ -149,7 +149,7 @@ export function LandPlotCard({ plot, onSeeMore, onInitiateTransfer, onView360 })
         <div className="space-y-2">
           <div className="flex gap-2">
             <Button onClick={() => onSeeMore(plot)} variant="outline" className="flex-1">See More</Button>
-            {user?.role === 'SuperAdmin' && (
+            {user?.role === 'Admin' && (
               <Button
                 onClick={() => {
                   const nextMap = { 'cleared': 'blocked', 'blocked': isPublic ? 'flagged' : 'cleared', 'flagged': 'blocked', 'transferred': 'cleared' };

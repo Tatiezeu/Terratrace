@@ -34,7 +34,29 @@ export function RegisterOfficerModal({
   });
   const [showPassword, setShowPassword] = useState(false);
 
+  // Conformity validation patterns
+  const matriculePattern = /^\d{5}$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phonePattern = /^\+?[0-9\s-]{9,15}$/;
+
+  const conformity = {
+    names: formData.firstName.trim().length >= 2 && formData.lastName.trim().length >= 2,
+    matricule: matriculePattern.test(formData.matricule),
+    email: emailPattern.test(formData.email),
+    phone: phonePattern.test(formData.phone),
+    password: formData.password.length >= 6 && /[A-Z]/.test(formData.password) && /[0-9]/.test(formData.password),
+    assignment: officerType === "lro" ? !!formData.region : !!formData.jurisdiction
+  };
+
+  const isConformed = Object.values(conformity).every(Boolean);
+
   const handleSubmit = async () => {
+    if (!isConformed) {
+      toast.error("Conformity Check Failed", {
+        description: "Please ensure all credentials and assignments pass the conformity check."
+      });
+      return;
+    }
     try {
         const prefix = officerType === "lro" ? "CM" : "CH";
         const fullMatricule = `${prefix}${formData.matricule}`;
@@ -128,7 +150,7 @@ export function RegisterOfficerModal({
                 : "Chamber Registration (CH + 5 digits)"}
             </Label>
             <div className="flex items-center gap-2">
-              <div className="px-3 py-2 bg-muted border border-border rounded-lg text-sm font-mono">
+              <div className="px-3 py-2 bg-muted border border-border rounded-lg text-sm font-mono font-bold">
                 {officerType === "lro" ? "CM" : "CH"}
               </div>
               <Input
@@ -234,6 +256,59 @@ export function RegisterOfficerModal({
               placeholder="email@terratrace.cm"
             />
           </div>
+
+          {/* Conformity Check Status Widget */}
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5 space-y-2.5">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-200/50 dark:border-white/10">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Conformity Check</span>
+              <span className={`text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full ${
+                isConformed 
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400" 
+                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-400"
+              }`}>
+                {isConformed ? "PASSED" : "PENDING"}
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 text-[11px] font-medium text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.names ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>Name Validity</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.matricule ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>Matricule digits</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.email ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>Email format</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.phone ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>Phone format</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.password ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>Password Strength</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.assignment ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
+                  ✓
+                </div>
+                <span>{officerType === "lro" ? "Assigned Region" : "Jurisdiction"}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
@@ -242,7 +317,12 @@ export function RegisterOfficerModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            className="bg-[var(--terra-emerald)] hover:bg-emerald-600"
+            disabled={!isConformed}
+            className={`transition-colors duration-300 ${
+              isConformed 
+                ? "bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white" 
+                : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+            }`}
           >
             Register Officer
           </Button>

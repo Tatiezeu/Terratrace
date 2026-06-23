@@ -20,24 +20,16 @@ import { cn } from "../app/components/ui/utils";
 import { useAuth } from "../context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePublicNotices } from "../hooks/useTransferData";
+import { useConfig } from "../hooks/useConfig";
 
 export default function NoticeBoardPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
-  const { data: notices = [] } = usePublicNotices();
-
-  const [config, setConfig] = useState(null);
+  const { data: notices = [], isLoading: noticesLoading } = usePublicNotices();
+  const { data: config = {} } = useConfig();
   const [clearedNoticeIds, setClearedNoticeIds] = useState([]);
-
-  useEffect(() => {
-    api.get('/config')
-      .then(res => {
-        if (res.data.success) setConfig(res.data.data);
-      })
-      .catch(err => console.warn("Failed to load config:", err));
-  }, []);
 
   // Load cleared notice IDs from localStorage
   useEffect(() => {
@@ -131,7 +123,7 @@ export default function NoticeBoardPage() {
               Official land transfer, succession, and dispute notices across Cameroon's 10 regions.
             </p>
           </div>
-          {user?.role === 'SuperAdmin' && (
+          {user?.role === 'Admin' && (
             <Button
               onClick={handleClearAllNotices}
               className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl h-11 px-6 shadow-lg shadow-red-500/10 gap-2 shrink-0 md:self-end"
@@ -173,15 +165,31 @@ export default function NoticeBoardPage() {
 
       {/* Notice Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <AnimatePresence>
-          {filteredNotices.map((notice, index) => (
-            <motion.div
-              key={notice._id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ delay: index * 0.08 }}
-            >
+        {noticesLoading && notices.length === 0 ? (
+          [1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm p-4 space-y-4 animate-pulse">
+              <div className="h-48 bg-muted rounded-lg animate-pulse" />
+              <div className="space-y-3">
+                <div className="h-5 w-1/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-2/3 bg-muted rounded-md animate-pulse" />
+                <div className="h-4 w-1/2 bg-muted rounded-md animate-pulse" />
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+                <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+              </div>
+            </div>
+          ))
+        ) : (
+          <AnimatePresence>
+            {filteredNotices.map((notice, index) => (
+              <motion.div
+                key={notice._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ delay: index * 0.08 }}
+              >
               <Card className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all group h-full flex flex-col">
                 <div className="relative h-48">
                   <img src={notice.plot.coverImage ? `http://localhost:5001${notice.plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -261,6 +269,7 @@ export default function NoticeBoardPage() {
             </motion.div>
           ))}
         </AnimatePresence>
+        )}
       </div>
 
       {filteredNotices.length === 0 && (

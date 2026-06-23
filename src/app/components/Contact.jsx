@@ -1,6 +1,8 @@
 import { motion } from 'motion/react';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import api from '../../utils/api';
+import { toast } from 'sonner';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -9,11 +11,32 @@ export default function Contact() {
     subject: '',
     message: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    // Handle form submission logic here
+    setIsSubmitting(true);
+    try {
+      const response = await api.post('/notifications/contact', formData);
+      if (response.data.success) {
+        toast.success("Message sent successfully!", {
+          description: "Our administration team will review your inquiry shortly."
+        });
+        setFormData({
+          name: '',
+          email: '',
+          subject: '',
+          message: '',
+        });
+      }
+    } catch (err) {
+      console.error("Failed to send contact message:", err);
+      toast.error("Failed to send message", {
+        description: err.response?.data?.message || "Please check your connection and try again."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -214,12 +237,22 @@ export default function Contact() {
 
               <motion.button
                 type="submit"
+                disabled={isSubmitting}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#F4C430] text-[#002147] rounded-xl hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group"
+                className={`w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#F4C430] text-[#002147] rounded-xl hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-3 group ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <span className="tracking-wide">Send Message</span>
-                <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                {isSubmitting ? (
+                  <>
+                    <span className="tracking-wide">Sending...</span>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  </>
+                ) : (
+                  <>
+                    <span className="tracking-wide">Send Message</span>
+                    <Send className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  </>
+                )}
               </motion.button>
             </form>
           </motion.div>

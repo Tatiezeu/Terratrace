@@ -62,9 +62,10 @@ export default function ClientDashboard() {
   }, []);
 
   // ─── Server state via TanStack Query (cached, deduped, stale-while-revalidate) ───
-  const { data: plots = [], isFetching: plotsFetching } = useLandPlots();
+  const { data: plots = [], isFetching: plotsFetching, isLoading: plotsLoading } = useLandPlots();
   const { data: transfers = [] } = useMyTransfers();
   const loading = plotsFetching;
+  const showSkeletons = plotsLoading || (plotsFetching && plots.length === 0);
 
   // ─── UI state ────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,15 +92,47 @@ export default function ClientDashboard() {
     logActivity('Read', `User viewed 360 virtual tour for Plot '${plot.landCode}'`);
   };
 
-  const LOCATIONS = [...new Set(plots.map((p) => p.location?.split(",")[1]?.trim()).filter(Boolean))];
+  const LOCATIONS = [...new Set(plots.map((p) => p.location?.split(",")[1]?.trim() || p.location?.trim()).filter(Boolean))];
 
   const filteredPlots = plots.filter((plot) => {
     const q = searchQuery.toLowerCase();
-    const ownerName = plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "";
-    const matchSearch = !q || plot.landCode.toLowerCase().includes(q) || plot.location.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q) || plot.landCode.split("-")[2]?.toLowerCase().includes(q);
-    const matchLocation = filterLocation === "all" || plot.location.toLowerCase().includes(filterLocation.toLowerCase());
-    const matchOwner = !filterOwner || ownerName.toLowerCase().includes(filterOwner.toLowerCase()) || plot.landCode.split("-")[2]?.toLowerCase().includes(filterOwner.toLowerCase());
-    return matchSearch && matchLocation && matchOwner;
+    
+    // Extract owner name
+    let ownerName = "";
+    if (plot.owner) {
+      if (typeof plot.owner === "object") {
+        ownerName = `${plot.owner.firstName || ""} ${plot.owner.lastName || ""}`.trim();
+      } else if (typeof plot.owner === "string") {
+        ownerName = plot.owner;
+      }
+    }
+    
+    // Extract owner ID
+    let ownerId = "";
+    if (plot.owner && typeof plot.owner === "object") {
+      ownerId = plot.owner._id || plot.owner.id || "";
+    } else if (plot.owner && typeof plot.owner === "string" && plot.owner.match(/^[0-9a-fA-F]{24}$/)) {
+      ownerId = plot.owner;
+    }
+    
+    const matchesSearch =
+      !q ||
+      plot.landCode.toLowerCase().includes(q) ||
+      plot.location.toLowerCase().includes(q) ||
+      ownerName.toLowerCase().includes(q) ||
+      (ownerId && ownerId.toLowerCase().includes(q)) ||
+      (plot.landCode.split("-")[2]?.toLowerCase().includes(q));
+
+    const matchesLocation =
+      filterLocation === "all" ||
+      plot.location.toLowerCase().includes(filterLocation.toLowerCase());
+
+    const matchesOwner =
+      !filterOwner ||
+      ownerName.toLowerCase().includes(filterOwner.toLowerCase()) ||
+      (ownerId && ownerId.toLowerCase().includes(filterOwner.toLowerCase()));
+
+    return matchesSearch && matchesLocation && matchesOwner;
   });
 
   const getProgressPercentage = (status) => {
@@ -176,16 +209,60 @@ export default function ClientDashboard() {
           <AnimatePresence>
             {showFilters && (
               <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                <div className="p-4 bg-muted/40 rounded-2xl border flex flex-wrap gap-2">
-                   {["all", ...LOCATIONS].map(loc => (
-                     <Button key={loc} variant={filterLocation === loc ? "default" : "outline"} size="sm" onClick={() => setFilterLocation(loc)} className="rounded-full h-8 px-4 text-xs">{loc === 'all' ? 'All Regions' : loc}</Button>
-                   ))}
+                <div className="p-5 bg-muted/40 rounded-2xl border space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Filter by Region</label>
+                    <div className="flex flex-wrap gap-2">
+                       {["all", ...LOCATIONS].map(loc => (
+                         <Button key={loc} variant={filterLocation === loc ? "default" : "outline"} size="sm" onClick={() => setFilterLocation(loc)} className="rounded-full h-8 px-4 text-xs">{loc === 'all' ? 'All Regions' : loc}</Button>
+                       ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="filterOwner" className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Owner ID or Name</label>
+                      <Input
+                        id="filterOwner"
+                        placeholder="Enter owner name or ID..."
+                        value={filterOwner}
+                        onChange={(e) => setFilterOwner(e.target.value)}
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="filterLandCode" className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Plot Number / Land Code</label>
+                      <Input
+                        id="filterLandCode"
+                        placeholder="Enter plot land code..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {view === "grid" ? (
+          {showSkeletons ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-card border border-border rounded-xl overflow-hidden shadow-sm p-4 space-y-4">
+                  <div className="h-56 bg-muted rounded-lg animate-pulse" />
+                  <div className="space-y-3">
+                    <div className="h-5 w-1/3 bg-muted rounded-md animate-pulse" />
+                    <div className="h-4 w-2/3 bg-muted rounded-md animate-pulse" />
+                    <div className="h-4 w-1/2 bg-muted rounded-md animate-pulse" />
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+                    <div className="h-9 w-24 bg-muted rounded-lg animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : view === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {filteredPlots.map(plot => (
                 <LandPlotCard key={plot._id} plot={plot} onSeeMore={handleSeeMore} onInitiateTransfer={(p) => { setSelectedPlot(p); setIsTransferOpen(true); }} onView360={handleView360} />

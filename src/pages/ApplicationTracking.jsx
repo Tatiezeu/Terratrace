@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import PaymentPage from './PaymentPage';
 import { 
   FileSearch, 
   MapPin, 
@@ -38,6 +40,7 @@ import {
  * to trace and monitor the detailed stepper progress of their Land Title Transfer files in real time.
  */
 export default function ApplicationTracking() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -46,6 +49,7 @@ export default function ApplicationTracking() {
 
   const [clearedAppIds, setClearedAppIds] = useState([]);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [activePaymentId, setActivePaymentId] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -55,7 +59,7 @@ export default function ApplicationTracking() {
   }, [user]);
 
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
-  const { data: rawTransfers = [], isLoading: loading } = useMyTransfers();
+  const { data: rawTransfers = [], isLoading: loading, refetch: refetchTransfers } = useMyTransfers();
 
   // ─── Normalize backend status enum to local display enum ─────────────────
   const applications = useMemo(() => {
@@ -80,7 +84,8 @@ export default function ApplicationTracking() {
               app.status === 'Completed' ? 'notary_verified' : app.status,
       transferType: app.transferType || "purchase",
       submittedAt: new Date(app.createdAt).toLocaleDateString(),
-      senderId: app.sender?._id || app.sender?.id || app.sender
+      senderId: app.sender?._id || app.sender?.id || app.sender,
+      rawStatus: app.status
     }));
   }, [rawTransfers]);
 
@@ -498,7 +503,16 @@ export default function ApplicationTracking() {
                 </AnimatePresence>
 
                 {/* Bottom Bar: Action Trigger Drawer */}
-                <div className="flex justify-end pt-4 border-t border-gray-50 items-center">
+                <div className="flex justify-end pt-4 border-t border-gray-50 items-center gap-2">
+                  {app.rawStatus === 'Awaiting_Fee_Payment' && (
+                    <Button 
+                      size="sm" 
+                      className="h-9 gap-2 text-xs font-bold bg-[#D4AF37] hover:bg-[#B8943A] text-[#002147] rounded-xl transition-all shadow-sm"
+                      onClick={() => setActivePaymentId(app.id)}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Proceed to Payment
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -621,6 +635,32 @@ export default function ApplicationTracking() {
               Confirm Clear
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Part 7: Secure Payment Modal Overlay ─── */}
+      <Dialog open={!!activePaymentId} onOpenChange={(open) => { if (!open) setActivePaymentId(null); }}>
+        <DialogContent className="max-w-2xl bg-white border border-gray-100 rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[95vh] focus-visible:outline-none">
+          <DialogHeader className="pb-4 border-b border-gray-100">
+            <DialogTitle className="font-['Syne'] text-xl text-[#002147] flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#D4AF37]" /> Secure Escrow Payment
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Complete your transaction securely using the CamPay Mobile Money Gateway.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {activePaymentId && (
+            <PaymentPage 
+              id={activePaymentId} 
+              isModal={true} 
+              onClose={() => setActivePaymentId(null)} 
+              onSuccess={() => {
+                toast.success("Refreshing applications list...");
+                refetchTransfers();
+              }} 
+            />
+          )}
         </DialogContent>
       </Dialog>
 

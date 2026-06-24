@@ -132,6 +132,15 @@ export default function NotaryDashboard() {
     }
   };
 
+  const handleOpenPrepareFee = (req) => {
+    setSelectedRequest(req);
+    const area = req.transferArea || (req.plot && req.plot.area) || 0;
+    const calcFee = area * 1000;
+    setFeeAmount(calcFee.toString());
+    setFeeDesc(`Land transfer fee notice for plot ${req.plot?.landCode || ''} (Area: ${area} sqm)`);
+    setIsFeeModalOpen(true);
+  };
+
   const filteredRequests = requests.filter(r => 
     (r.plot?.landCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     `${r.sender?.firstName} ${r.sender?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -215,13 +224,10 @@ export default function NotaryDashboard() {
                     </div>
                     <div className="flex items-center gap-3">
                       {req.status === 'Under_Verification' && (
-                        <Button onClick={() => { setSelectedRequest(req); setIsFeeModalOpen(true); }} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Prepare Fee Notice</Button>
+                        <Button onClick={() => handleOpenPrepareFee(req)} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Prepare Fee Notice</Button>
                       )}
-                      {req.status === 'Awaiting_Fee_Payment' && (
-                        <Button onClick={() => { setSelectedRequest(req); setIsPaymentReceivedModalOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Payment Received</Button>
-                      )}
-                      {req.status === 'Payment_Submitted' && (
-                        <Button onClick={() => { setSelectedRequest(req); setIsPaymentReceivedModalOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold">Verify &amp; Add Docs</Button>
+                      {(req.status === 'Awaiting_Fee_Payment' || req.status === 'Payment_Submitted') && (
+                        <Button disabled className="bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-lg h-9 px-6 font-bold flex items-center gap-2 cursor-not-allowed opacity-60">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
                       )}
                       {req.status === 'Payment_Verified' && (
                         <Button onClick={() => { setSelectedRequest(req); setIsForwardModalOpen(true); }} className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white rounded-lg h-9 px-6 font-bold flex items-center gap-2">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
@@ -546,7 +552,7 @@ export default function NotaryDashboard() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Regional Registry Forwarding</DialogTitle>
-            <DialogDescription>Select the LRO in the appropriate region for final code issuance.</DialogDescription>
+            <DialogDescription>Select the LRO in the appropriate region and attach final certified documents.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
              <div className="space-y-2">
@@ -560,15 +566,42 @@ export default function NotaryDashboard() {
                    </SelectContent>
                 </Select>
              </div>
+             
+             <div className="space-y-2">
+                <Label>Final Certified Land Deeds &amp; Dossier Documents</Label>
+                <Input type="file" id="certified_upload_forward" multiple onChange={e => setCertifiedDocs(prev => [...prev, ...Array.from(e.target.files)])} className="h-11 border-dashed pt-2.5 rounded-xl cursor-pointer" />
+                {certifiedDocs.length > 0 && (
+                   <div className="flex flex-wrap gap-2 pt-2">
+                      {certifiedDocs.map((f, i) => (
+                        <Badge key={i} variant="secondary" className="text-[9px] gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40 flex items-center">
+                           <FileCheck className="w-3 h-3 text-emerald-600 shrink-0" /> 
+                           <span className="truncate max-w-[150px]">{f.name}</span>
+                           <button
+                             type="button"
+                             onClick={(e) => {
+                               e.preventDefault();
+                               e.stopPropagation();
+                               setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i));
+                             }}
+                             className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center shrink-0"
+                           >
+                             <X className="w-3 h-3" />
+                           </button>
+                        </Badge>
+                      ))}
+                   </div>
+                )}
+             </div>
+
              <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-xl text-xs text-blue-700 dark:text-blue-400 italic border border-blue-100 dark:border-blue-800/30 flex gap-2">
                 <ShieldCheck className="w-5 h-5 shrink-0 opacity-50" />
-                "By forwarding, you certify that the transaction is legally valid and the dossier is complete for final registry entry."
+                <span>"By forwarding, you certify that the transaction is legally valid and the dossier is complete for final registry entry."</span>
              </div>
           </div>
           <DialogFooter>
              <Button 
-               disabled={!selectedLro}
-               onClick={() => handleUpdateStatus(selectedRequest._id, 'Forwarded_to_LRO', { lroId: selectedLro })} 
+               disabled={!selectedLro || certifiedDocs.length === 0}
+               onClick={() => handleUpdateStatus(selectedRequest._id, 'Forwarded_to_LRO', { lroId: selectedLro, certifiedDocuments: certifiedDocs })} 
                className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white w-full h-12 rounded-xl font-bold gap-2 uppercase tracking-widest text-xs"
              >
                 <Send className="w-4 h-4" /> Authorize &amp; Forward to Registry

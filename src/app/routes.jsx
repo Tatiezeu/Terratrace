@@ -93,6 +93,7 @@ const NotificationsPage = withSuspense(lazy(() => import("../pages/Notifications
 const SettingsPage = withSuspense(lazy(() => import("../pages/SettingsPage")));
 const ApplicationTracking = withSuspense(lazy(() => import("../pages/ApplicationTracking")));
 const ResetPasswordPage = withSuspense(lazy(() => import("../pages/ResetPasswordPage")));
+const PaymentPage = withSuspense(lazy(() => import("../pages/PaymentPage")));
 
 export const router = createBrowserRouter([
   {
@@ -123,6 +124,11 @@ export const router = createBrowserRouter([
   {
     path: "/reset-password",
     Component: ResetPasswordPage,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/dashboard/payment/:id",
+    Component: PaymentPage,
     errorElement: <ErrorPage />,
   },
   {

@@ -49,6 +49,16 @@ export default function SettingsPage() {
   const [recaptchaMode, setRecaptchaMode] = useState("hybrid");
   const [recaptchaAttempts, setRecaptchaAttempts] = useState(3);
 
+  // CamPay & Escrow States
+  const [campayAppId, setCampayAppId] = useState("");
+  const [campayAppKey, setCampayAppKey] = useState("");
+  const [campayPassword, setCampayPassword] = useState("");
+  const [campayEnv, setCampayEnv] = useState("sandbox");
+  const [mindcafWalletNumber, setMindcafWalletNumber] = useState("");
+  const [mindcafOperator, setMindcafOperator] = useState("MTN");
+  const [terratraceWalletNumber, setTerratraceWalletNumber] = useState("");
+  const [terratraceOperator, setTerratraceOperator] = useState("MTN");
+
   const [logFilter, setLogFilter] = useState("All");
   const [clearLogsConfirmOpen, setClearLogsConfirmOpen] = useState(false);
 
@@ -128,6 +138,16 @@ export default function SettingsPage() {
       if (serverConfig.noticeDurationDays) setNoticeDurationDays(serverConfig.noticeDurationDays);
       if (serverConfig.noticeTestMode !== undefined) setNoticeTestMode(serverConfig.noticeTestMode);
       if (serverConfig.noticeTestMinutes) setNoticeTestMinutes(serverConfig.noticeTestMinutes);
+
+      // CamPay & Payout Configs
+      if (serverConfig.campay_app_id) setCampayAppId(serverConfig.campay_app_id);
+      if (serverConfig.campay_app_key) setCampayAppKey(serverConfig.campay_app_key);
+      if (serverConfig.campay_password) setCampayPassword(serverConfig.campay_password);
+      if (serverConfig.campay_env) setCampayEnv(serverConfig.campay_env);
+      if (serverConfig.mindcaf_wallet_number) setMindcafWalletNumber(serverConfig.mindcaf_wallet_number);
+      if (serverConfig.mindcaf_operator) setMindcafOperator(serverConfig.mindcaf_operator);
+      if (serverConfig.terratrace_wallet_number) setTerratraceWalletNumber(serverConfig.terratrace_wallet_number);
+      if (serverConfig.terratrace_operator) setTerratraceOperator(serverConfig.terratrace_operator);
     }
   }, [serverConfig]);
 
@@ -299,7 +319,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="login-attempts" className="w-full space-y-6">
-        <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-wrap lg:grid lg:grid-cols-6 gap-1">
+        <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-wrap lg:grid lg:grid-cols-7 gap-1">
           <TabsTrigger value="login-attempts" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <ShieldAlert className="w-4 h-4 mr-2" /> Login Attempts
           </TabsTrigger>
@@ -317,6 +337,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="recaptcha" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <ShieldAlert className="w-4 h-4 mr-2" /> Manage reCAPTCHA
+          </TabsTrigger>
+          <TabsTrigger value="campay" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm lg:ml-2">
+            <Smartphone className="w-4 h-4 mr-2" /> CamPay API Settings
           </TabsTrigger>
         </TabsList>
 
@@ -793,6 +816,111 @@ export default function SettingsPage() {
                   className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-8 rounded-xl h-11 shadow-lg"
                 >
                   Save Policies
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Manage CamPay API & Wallet Settings */}
+        <TabsContent value="campay">
+          <Card className="border-none shadow-sm bg-white/50 dark:bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden">
+            <CardHeader>
+              <CardTitle className="font-['Syne'] flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-[var(--terra-emerald)]" />
+                CamPay API & Escrow Wallet Settings
+              </CardTitle>
+              <CardDescription>Configure credentials and escrow destination wallets for Cameroon Land Registry transfer fee collections.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pb-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* CamPay Credentials Card */}
+                <div className="space-y-4 p-6 bg-white/80 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl shadow-sm">
+                  <h3 className="text-sm font-bold text-[#002147] dark:text-white uppercase tracking-wider">CamPay API Credentials</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="campayAppId">App ID</Label>
+                    <Input id="campayAppId" value={campayAppId} onChange={e => setCampayAppId(e.target.value)} className="rounded-xl h-11" placeholder="e.g. app_12345" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="campayAppKey">App Key (Username)</Label>
+                    <Input id="campayAppKey" value={campayAppKey} onChange={e => setCampayAppKey(e.target.value)} className="rounded-xl h-11" placeholder="e.g. api_key_abc123" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="campayPassword">App Password</Label>
+                    <Input id="campayPassword" type="password" value={campayPassword} onChange={e => setCampayPassword(e.target.value)} className="rounded-xl h-11" placeholder="••••••••" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="campayEnv">API Environment</Label>
+                    <select id="campayEnv" value={campayEnv} onChange={e => setCampayEnv(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm">
+                      <option value="sandbox">Sandbox / Demo (demo.campay.net)</option>
+                      <option value="live">Live / Production (www.campay.net)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Destination Wallets Card */}
+                <div className="space-y-4 p-6 bg-white/80 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl shadow-sm">
+                  <h3 className="text-sm font-bold text-[#002147] dark:text-white uppercase tracking-wider">Escrow Settlement Wallets</h3>
+                  
+                  {/* MINDCAF Payout Wallet */}
+                  <div className="space-y-3 pt-2 border-b pb-4">
+                    <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">MINDCAF Base Fee Wallet (100%)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2 space-y-1">
+                        <Label htmlFor="mindcafWallet">Mobile Wallet Number</Label>
+                        <Input id="mindcafWallet" value={mindcafWalletNumber} onChange={e => setMindcafWalletNumber(e.target.value)} className="rounded-xl h-11" placeholder="e.g. 677777777" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="mindcafOperator">Operator</Label>
+                        <select id="mindcafOperator" value={mindcafOperator} onChange={e => setMindcafOperator(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm">
+                          <option value="MTN">MTN MoMo</option>
+                          <option value="Orange">Orange Money</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TerraTrace Surplus Wallet */}
+                  <div className="space-y-3 pt-2">
+                    <p className="text-xs font-bold text-amber-600 dark:text-amber-400">TerraTrace Platform Wallet (10% Surplus)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="col-span-2 space-y-1">
+                        <Label htmlFor="terratraceWallet">Mobile Wallet Number</Label>
+                        <Input id="terratraceWallet" value={terratraceWalletNumber} onChange={e => setTerratraceWalletNumber(e.target.value)} className="rounded-xl h-11" placeholder="e.g. 699999999" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="terratraceOperator">Operator</Label>
+                        <select id="terratraceOperator" value={terratraceOperator} onChange={e => setTerratraceOperator(e.target.value)} className="w-full px-3 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm">
+                          <option value="MTN">MTN MoMo</option>
+                          <option value="Orange">Orange Money</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="pt-6 border-t border-border flex justify-end">
+                <Button 
+                  onClick={() => updateConfig({
+                    campay_app_id: campayAppId,
+                    campay_app_key: campayAppKey,
+                    campay_password: campayPassword,
+                    campay_env: campayEnv,
+                    mindcaf_wallet_number: mindcafWalletNumber,
+                    mindcaf_operator: mindcafOperator,
+                    terratrace_wallet_number: terratraceWalletNumber,
+                    terratrace_operator: terratraceOperator
+                  })}
+                  className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-8 rounded-xl h-11 shadow-lg font-bold"
+                >
+                  Save API Settings
                 </Button>
               </div>
             </CardContent>

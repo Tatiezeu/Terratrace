@@ -460,7 +460,10 @@ export default function LRODashboard() {
                               <ShieldCheck className="w-4 h-4 text-emerald-600" />
                               <span className="text-[11px] font-bold truncate max-w-[200px] text-[#002147] dark:text-white">{typeof doc === 'string' ? doc.split('/').pop() : (doc.name || `Certified_Dossier_${i+1}`)}</span>
                            </div>
-                           <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                           <div className="flex gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-emerald-50 text-emerald-600" onClick={() => window.open(`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`, '_blank')}><Eye className="w-4 h-4" /></Button>
+                              <a href={`http://localhost:5001${typeof doc === 'string' ? doc : doc.url}`} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg"><Download className="w-4 h-4" /></a>
+                           </div>
                         </div>
                       ))}
                       {selectedRequest?.paymentReceipt && (

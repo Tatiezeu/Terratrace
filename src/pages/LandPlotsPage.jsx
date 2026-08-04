@@ -1,4 +1,6 @@
-import { useState, useMemo } from "react";
+// BEHAVIOR: Renders the public land plots directory page, letting clients explore, filter, search, and view 360 virtual tours.
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams, useLocation } from "react-router-dom";
 import api from "../utils/api";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
@@ -21,13 +23,19 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+// BACKEND_CONNECTION: Custom hook querying the database for all registered land plots
 import { useLandPlots } from "../hooks/useLandData";
 import { logActivity } from "../utils/logger";
+import { cn } from "../app/components/ui/utils";
+import { getValidMatterportId } from "../utils/matterport";
 
 export default function LandPlotsPage() {
   // ─── Server state via TanStack Query (cached, deduped) ────────────────────
+  // BACKEND_CONNECTION: Fetches land plots from DB
   const { data: plots = [], isLoading: loading } = useLandPlots();
 
   // ─── UI state ─────────────────────────────────────────────────
@@ -40,6 +48,23 @@ export default function LandPlotsPage() {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  useEffect(() => {
+    const query = searchParams.get("search") || location.state?.searchPlot || "";
+    if (query) {
+      setSearchQuery(query);
+    }
+  }, [searchParams, location]);
+
+  useEffect(() => {
+    if (!is360Open) {
+      setIsMaximized(false);
+    }
+  }, [is360Open]);
 
   // ─── Derive priceRange max from cached plots data ────────────────────────
   const maxPrice = useMemo(() => {
@@ -48,6 +73,7 @@ export default function LandPlotsPage() {
   }, [plots]);
   const [priceRange, setPriceRange] = useState([0, 100000000]);
 
+  // BEHAVIOR: Filters land plots locally based on search terms (land code, location, owner details) and price boundaries
   const filteredPlots = useMemo(() => {
     return plots.filter((plot) => {
       const q = searchQuery.toLowerCase();
@@ -131,6 +157,7 @@ export default function LandPlotsPage() {
     <div className="space-y-6 pb-12">
       {/* Header */}
       <div>
+        {/* COLOR_THEME: Header title uses Syne Font family */}
         <h1 className="text-3xl font-bold font-['Syne']">Land Registry Exploration</h1>
         <p className="text-muted-foreground mt-1 text-base">
           Browse and verify all registered land plots across Cameroon.
@@ -165,6 +192,7 @@ export default function LandPlotsPage() {
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
+              // COLOR_THEME: Filter badge count colored in Terra Emerald green
               <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[var(--terra-emerald)] text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
@@ -199,6 +227,7 @@ export default function LandPlotsPage() {
                       <button
                         key={loc}
                         onClick={() => setSelectedLocation(loc)}
+                        // COLOR_THEME: Selected location button uses Terra Navy background, unselected uses transparent border
                         className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
                           selectedLocation === loc
                             ? "bg-[var(--terra-navy)] text-white border-[var(--terra-navy)]"
@@ -218,12 +247,14 @@ export default function LandPlotsPage() {
                   </p>
                   <div className="space-y-3 px-1">
                     <div className="flex justify-between text-sm font-semibold">
+                      {/* COLOR_THEME: Price labels use Terra Emerald green style */}
                       <span className="text-[var(--terra-emerald)]">{priceRange[0].toLocaleString()} XAF</span>
                       <span className="text-[var(--terra-emerald)]">{priceRange[1].toLocaleString()} XAF</span>
                     </div>
                     {/* Min slider */}
                     <div className="relative h-6 flex items-center">
                       <div className="absolute w-full h-2 bg-muted rounded-full" />
+                      {/* COLOR_THEME: Range active selector track styled in Terra Emerald */}
                       <div
                         className="absolute h-2 bg-[var(--terra-emerald)] rounded-full"
                         style={{
@@ -241,6 +272,7 @@ export default function LandPlotsPage() {
                           const val = Number(e.target.value);
                           if (val < priceRange[1]) setPriceRange([val, priceRange[1]]);
                         }}
+                        // COLOR_THEME: Slider handles styled with Terra Navy background fill
                         className="absolute w-full appearance-none bg-transparent cursor-pointer
                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5
                           [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full
@@ -258,6 +290,7 @@ export default function LandPlotsPage() {
                           const val = Number(e.target.value);
                           if (val > priceRange[0]) setPriceRange([priceRange[0], val]);
                         }}
+                        // COLOR_THEME: Slider handles styled with Terra Navy background fill
                         className="absolute w-full appearance-none bg-transparent cursor-pointer
                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5
                           [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full
@@ -322,6 +355,7 @@ export default function LandPlotsPage() {
       </div>
 
       {/* Grid */}
+      {/* BEHAVIOR: Renders skeleton loading grid if fetching data from the database */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map(i => (
@@ -368,29 +402,40 @@ export default function LandPlotsPage() {
 
       {/* Matterport 360° Dialog */}
       <Dialog open={is360Open} onOpenChange={setIs360Open}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b">
+        <DialogContent 
+          className={cn(
+            "p-0 overflow-hidden transition-all duration-300 ease-in-out flex flex-col",
+            isMaximized 
+              ? "max-w-none w-[96vw] h-[92vh] rounded-2xl" 
+              : "max-w-4xl w-full rounded-2xl"
+          )}
+        >
+          <DialogHeader className="px-6 pt-5 pb-3 border-b flex flex-row items-center justify-between">
+            {/* COLOR_THEME: Header Title uses Syne Font family */}
             <DialogTitle className="flex items-center gap-2 font-['Syne']">
+              {/* COLOR_THEME: Uses Terra Emerald text style */}
               <Eye className="w-5 h-5 text-[var(--terra-emerald)]" />
               360° Virtual Tour — {matterportPlot?.landCode}
             </DialogTitle>
+            <Button
+              onClick={() => setIsMaximized(!isMaximized)}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground mr-6 shrink-0"
+              title={isMaximized ? "Restore view" : "Maximize view"}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
           </DialogHeader>
-          {matterportPlot?.matterportId ? (
-            <div className="aspect-video w-full">
-              <iframe
-                src={`https://my.matterport.com/show/?m=${matterportPlot.matterportId}`}
-                className="w-full h-full"
-                allowFullScreen
-                title="Matterport 360 Tour"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <Eye className="w-12 h-12 mb-3 opacity-30" />
-              <p className="font-semibold">No virtual tour available</p>
-              <p className="text-sm mt-1">This plot does not have a 360° scan yet.</p>
-            </div>
-          )}
+          <div className={cn("w-full", isMaximized ? "flex-1 h-full" : "aspect-video")}>
+            {/* BACKEND_CONNECTION: Pulls Matterport 3D scan iframe data */}
+            <iframe
+              src={`https://my.matterport.com/show/?m=${getValidMatterportId(matterportPlot?.matterportId, matterportPlot?.landCode)}`}
+              className="w-full h-full border-0"
+              allow="xr-spatial-tracking"
+              title="Matterport 360 Tour"
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

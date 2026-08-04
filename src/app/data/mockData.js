@@ -8,7 +8,7 @@ export const mockLandPlots = [
     location: "Douala, Littoral",
     area: 500,
     owner: "Jean-Claude Mbarga",
-    matterportId: "abc123xyz",
+    matterportId: "SxQL3iGyvJ5",
     gpsCoordinates: { lat: 4.0511, lng: 9.7679 },
     ownershipHistory: [
       { date: "2020-03-15", owner: "Jean-Claude Mbarga", transferType: "Purchase" },
@@ -24,7 +24,7 @@ export const mockLandPlots = [
     location: "Yaoundé, Centre",
     area: 350,
     owner: "Aminata Diallo",
-    matterportId: "def456uvw",
+    matterportId: "zL68q4mQv25",
     gpsCoordinates: { lat: 3.848, lng: 11.5021 },
     ownershipHistory: [
       { date: "2019-11-08", owner: "Aminata Diallo", transferType: "Purchase" },
@@ -39,7 +39,7 @@ export const mockLandPlots = [
     location: "Bafoussam, West",
     area: 750,
     owner: "Paul Nkeng",
-    matterportId: "ghi789rst",
+    matterportId: "JGP2vdBxioE",
     gpsCoordinates: { lat: 5.4781, lng: 10.4178 },
     ownershipHistory: [
       { date: "2018-05-14", owner: "Paul Nkeng", transferType: "Inheritance" },

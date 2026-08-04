@@ -120,12 +120,12 @@ export default function RegistrationPage() {
 
       if (response.data.success) {
         toast.success("Account Created Successfully!", {
-          description: "An activation link has been sent to your email. Please click the link to activate your account before logging in.",
+          description: "A verification code has been sent to your email. Please enter it to verify your account.",
           duration: 6000
         });
         // Store email for any potential manual access
         localStorage.setItem('temp_email', formData.email);
-        navigate("/login");
+        navigate("/verify-email");
       }
     } catch (err) {
       toast.error("Registration failed", {

@@ -1,4 +1,6 @@
+// BEHAVIOR: Renders the sidebar layout panel displaying navigation items adjusted to the active user role, system stats, and logout triggers.
 import { Link, useLocation, useNavigate } from "react-router-dom";
+// BEHAVIOR: Lucide React icons matching sidebar links
 import {
   LayoutDashboard,
   Map,
@@ -20,10 +22,13 @@ import { cn } from "../ui/utils";
 import { motion } from "motion/react";
 import Logo from "../shared/Logo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+// BACKEND_CONNECTION: Custom Axios API client
 import api from "../../../utils/api";
+// BACKEND_CONNECTION: Custom hook querying the full user directory for administrators
 import { useAllUsers } from "../../../hooks/useAdminData";
 import { setCachedData } from "../../../utils/cache";
 
+// BEHAVIOR: Defines all navigation link items with associated icons, roles allowed to access them, and route path targets
 const navItems = [
   {
     label: "Dashboard",
@@ -73,6 +78,7 @@ const navItems = [
     path: "/dashboard/notifications",
     roles: ["Client", "Landowner", "LRO", "Notary", "Admin"],
   },
+
   {
     label: "Public Notices",
     icon: <Users className="w-5 h-5" />,
@@ -100,15 +106,18 @@ export function Sidebar({ user }) {
 
   const isAdmin = user?.role === "Admin";
 
+  // BACKEND_CONNECTION: Custom query pulls all users in system if active user is administrator
   const { data: allUsers = [], isLoading: isLoadingUsers } = useAllUsers({
     enabled: isAdmin,
   });
 
+  // BACKEND_CONNECTION: Warm-up prefetch handler triggers Axios API requests before hover-clicks
   const handlePrefetch = (path) => {
     try {
       if (path === "/dashboard") {
         queryClient.prefetchQuery({
           queryKey: ['profile'],
+          // BACKEND_CONNECTION: GET /users/me - Prefetches profile data
           queryFn: async () => {
             const res = await api.get('/users/me');
             const data = res.data.data;
@@ -118,6 +127,7 @@ export function Sidebar({ user }) {
         });
         queryClient.prefetchQuery({
           queryKey: ['transfers'],
+          // BACKEND_CONNECTION: GET /transfer/my-transfers - Prefetches transfer list
           queryFn: async () => {
             const res = await api.get('/transfer/my-transfers');
             const data = res.data.data;
@@ -128,6 +138,7 @@ export function Sidebar({ user }) {
         if (user?.role === 'Client' || user?.role === 'Landowner') {
           queryClient.prefetchQuery({
             queryKey: ['land', 'my-plots'],
+            // BACKEND_CONNECTION: GET /land/my-plots - Prefetches personal plots
             queryFn: async () => {
               const res = await api.get('/land/my-plots');
               const data = res.data.data;
@@ -138,6 +149,7 @@ export function Sidebar({ user }) {
         } else {
           queryClient.prefetchQuery({
             queryKey: ['land'],
+            // BACKEND_CONNECTION: GET /land - Prefetches entire plot inventory
             queryFn: async () => {
               const res = await api.get('/land');
               const data = res.data.data;
@@ -149,6 +161,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/land-plots") {
         queryClient.prefetchQuery({
           queryKey: ['land'],
+          // BACKEND_CONNECTION: GET /land - Prefetches full plot inventory
           queryFn: async () => {
             const res = await api.get('/land');
             const data = res.data.data;
@@ -159,6 +172,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/my-land-plots") {
         queryClient.prefetchQuery({
           queryKey: ['land', 'my-plots'],
+          // BACKEND_CONNECTION: GET /land/my-plots - Prefetches user's plots
           queryFn: async () => {
             const res = await api.get('/land/my-plots');
             const data = res.data.data;
@@ -169,6 +183,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/applications") {
         queryClient.prefetchQuery({
           queryKey: ['transfers'],
+          // BACKEND_CONNECTION: GET /transfer/my-transfers - Prefetches transfer dossiers
           queryFn: async () => {
             const res = await api.get('/transfer/my-transfers');
             const data = res.data.data;
@@ -179,6 +194,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/notices") {
         queryClient.prefetchQuery({
           queryKey: ['transfers', 'public-notices'],
+          // BACKEND_CONNECTION: GET /transfer/public-notices - Prefetches public notices
           queryFn: async () => {
             const res = await api.get('/transfer/public-notices');
             const data = res.data.data;
@@ -189,6 +205,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/notifications") {
         queryClient.prefetchQuery({
           queryKey: ['notifications'],
+          // BACKEND_CONNECTION: GET /notifications - Prefetches user notifications inbox
           queryFn: async () => {
             const res = await api.get('/notifications');
             const data = res.data.data;
@@ -198,6 +215,7 @@ export function Sidebar({ user }) {
         });
         queryClient.prefetchQuery({
           queryKey: ['notifications', 'sent'],
+          // BACKEND_CONNECTION: GET /notifications/sent - Prefetches sent notifications
           queryFn: async () => {
             const res = await api.get('/notifications/sent');
             const data = res.data.data;
@@ -208,6 +226,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/profile") {
         queryClient.prefetchQuery({
           queryKey: ['profile'],
+          // BACKEND_CONNECTION: GET /users/me - Prefetches profile details
           queryFn: async () => {
             const res = await api.get('/users/me');
             const data = res.data.data;
@@ -218,6 +237,7 @@ export function Sidebar({ user }) {
       } else if (path === "/dashboard/admin") {
         queryClient.prefetchQuery({
           queryKey: ['users', 'all'],
+          // BACKEND_CONNECTION: GET /users - Prefetches all user records
           queryFn: async () => {
             const res = await api.get('/users');
             const data = res.data.data;
@@ -231,6 +251,7 @@ export function Sidebar({ user }) {
     }
   };
 
+  // BACKEND_CONNECTION: GET /logs - Queries activity log metrics to show system status (Admin only)
   const { data: activityLogs = [], isLoading: isLoadingLogs } = useQuery({
     queryKey: ['activity-logs'],
     queryFn: async () => {
@@ -254,6 +275,7 @@ export function Sidebar({ user }) {
     staleTime: 5 * 1000,
   });
 
+  // BEHAVIOR: Clear token and redirect to logout route
   const handleLogout = () => {
     localStorage.removeItem('token'); // Clear the JWT token
     navigate("/");
@@ -271,6 +293,7 @@ export function Sidebar({ user }) {
     return roleNames[role] || role;
   };
 
+  // BEHAVIOR: Evaluates which routes the active user role is authorized to view
   const visibleNavItems = navItems.filter((item) =>
     item.roles.includes(user.role)
   );
@@ -280,6 +303,7 @@ export function Sidebar({ user }) {
       initial={{ x: -280 }}
       animate={{ x: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      // COLOR_THEME: Main sidebar background styled in Terra Navy
       className="w-[280px] bg-[var(--terra-navy)] text-white flex flex-col"
     >
       {/* Logo Section */}
@@ -308,6 +332,7 @@ export function Sidebar({ user }) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
+                // COLOR_THEME: Active navigation items styled in Terra Emerald, inactive styled with white opacity highlights
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group relative",
                   isActive
@@ -350,6 +375,7 @@ export function Sidebar({ user }) {
                 Live System Stats
               </p>
               <div className="grid grid-cols-2 gap-2">
+                {/* COLOR_THEME: Visual stats widgets styled with subtle white border opacity */}
                 <div className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                   <Database className="w-3.5 h-3.5 text-purple-400 mb-1" />
                   <p className="text-xs font-bold">{nodesCount}</p>

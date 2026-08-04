@@ -1,4 +1,6 @@
+// BEHAVIOR: Internal messaging center for Terratrace users. Allows sending text + file attachments, filtering by roles, replying, archiving, and clearing messages.
 import { useState, useMemo, useRef, useEffect } from "react";
+// BEHAVIOR: Navigation & Action Icons (Paperclip, Trash, Archive, Reply, Download)
 import { 
   Bell, 
   Search, 
@@ -52,11 +54,15 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../app/components/ui/utils";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+// BACKEND_CONNECTION: Hooks query notifications, sent notifications, and potential messaging partners from database.
 import { useNotifications, useSentNotifications, useRecipients } from "../hooks/useNotificationsData";
 
 export default function NotificationsPage() {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewMsgOpen, setIsNewMsgOpen] = useState(false);
@@ -72,11 +78,14 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
 
   // ─── Server state via TanStack Query ─────────────────────────────────────────
+  // BACKEND_CONNECTION: useNotifications fetches inbox notifications
   const { data: notifications = [] } = useNotifications();
+  // BACKEND_CONNECTION: useSentNotifications fetches sent messages
   const { data: sentNotifications = [] } = useSentNotifications();
+  // BACKEND_CONNECTION: useRecipients fetches list of officers & clients for selection dropdown
   const { data: users = [] } = useRecipients();
 
-  // Load cleared notification IDs from localStorage on mount
+  // BEHAVIOR: Loads cleared notification IDs from localStorage on mount
   useEffect(() => {
     if (currentUser) {
       const saved = localStorage.getItem(`cleared_inbox_notifications_${currentUser._id || currentUser.id}`);
@@ -84,17 +93,39 @@ export default function NotificationsPage() {
     }
   }, [currentUser]);
 
+  // BEHAVIOR: Prefills compose message dialog if recipientId, subject, or body are in query params
+  useEffect(() => {
+    const qParams = new URLSearchParams(location.search);
+    const recipientId = qParams.get("recipientId");
+    const subject = qParams.get("subject");
+    const body = qParams.get("body");
+
+    if (recipientId && users.length > 0) {
+      const recipientUser = users.find(u => u._id === recipientId || u.id === recipientId);
+      if (recipientUser) {
+        setRecipientRole(recipientUser.role);
+        setSelectedRecipientId(recipientId);
+        if (subject) setNewMsgSubject(subject);
+        if (body) setNewMsgBody(body);
+        setIsNewMsgOpen(true);
+        // Clear query parameters from URL so that opening the page doesn't keep popping the dialog
+        navigate(location.pathname, { replace: true });
+      }
+    }
+  }, [location.search, users, navigate, location.pathname]);
+
   const [recipientRole, setRecipientRole] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState("");
   const [newMsgSubject, setNewMsgSubject] = useState("");
   const [newMsgBody, setNewMsgBody] = useState("");
 
+  // BEHAVIOR: Filters display list by inbox vs. sent active tabs and local hidden exclusions
   const displayList = useMemo(() => {
     if (activeTab === "sent") return sentNotifications;
-    // Filter out cleared notification IDs from inbox view
     return notifications.filter(n => !clearedNotifIds.includes(n._id));
   }, [activeTab, notifications, sentNotifications, clearedNotifIds]);
 
+  // BEHAVIOR: Filters display items by search string and category type
   const filteredNotifications = useMemo(() => {
     return displayList.filter(n => {
       const matchesSearch = 
@@ -113,15 +144,18 @@ export default function NotificationsPage() {
     });
   }, [searchQuery, activeTab, displayList]);
 
+  // BEHAVIOR: Handler executing status updates (read, archived) or direct deletion
   const handleAction = async (id, action, value) => {
     try {
       if (action === 'status') {
+        // BACKEND_CONNECTION: PATCH /notifications/:id/status updates the message state
         await api.patch(`/notifications/${id}/status`, { status: value });
         const msg = value === 'archived' ? "Notification archived" : 
                     value === 'read' && activeTab === 'archived' ? "Notification unarchived" : 
                     `Notification marked as ${value}`;
         toast.success(msg);
       } else if (action === 'delete') {
+        // BACKEND_CONNECTION: DELETE /notifications/:id deletes database row
         await api.delete(`/notifications/${id}`);
         toast.success("Notification deleted");
       }
@@ -136,8 +170,8 @@ export default function NotificationsPage() {
     setClearAllConfirmOpen(true);
   };
 
+  // BEHAVIOR: Excludes all notifications matching current inbox from local display only
   const executeClearAll = () => {
-    // Frontend-only clear: store cleared IDs in localStorage
     const idsToClear = notifications
       .filter(n => n.status !== 'archived')
       .map(n => n._id);
@@ -150,14 +184,17 @@ export default function NotificationsPage() {
     setClearAllConfirmOpen(false);
   };
 
+  // BEHAVIOR: Downloads notification attachment files in a separate tab
   const handleDownload = async (path) => {
     try {
+      // BACKEND_CONNECTION: GET server assets via direct relative download path
       window.open(`http://localhost:5001${path}`, '_blank');
     } catch (err) {
       toast.error("Download failed");
     }
   };
 
+  // BEHAVIOR: Handles selected local files loading check
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (attachments.length + files.length > 5) {
@@ -171,6 +208,7 @@ export default function NotificationsPage() {
     setAttachments(attachments.filter((_, i) => i !== index));
   };
 
+  // BEHAVIOR: Prepares reply context targeting sender of selected message
   const handleReplyClick = (msg) => {
     setTargetMsg(msg);
     setReplyText("");
@@ -178,6 +216,7 @@ export default function NotificationsPage() {
     setIsReplyOpen(true);
   };
 
+  // BEHAVIOR: Sends reply message, uploading attachments as Multipart Form data
   const sendReply = async () => {
     if (!replyText.trim() && attachments.length === 0) {
         toast.error("Please enter a message or attach a file");
@@ -192,6 +231,7 @@ export default function NotificationsPage() {
         formData.append('attachments', file);
       });
 
+      // BACKEND_CONNECTION: POST /notifications/send with multipart/form-data header
       await api.post('/notifications/send', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -206,6 +246,7 @@ export default function NotificationsPage() {
     }
   };
 
+  // BEHAVIOR: Formulates new message form variables into a Multipart payload and posts to server
   const handleCreateNewMsg = async () => {
     if (!selectedRecipientId || !newMsgBody || !newMsgSubject) {
       toast.error("Please fill all required fields");
@@ -220,6 +261,7 @@ export default function NotificationsPage() {
         formData.append('attachments', file);
       });
 
+      // BACKEND_CONNECTION: POST /notifications/send submitting new dialogue with attachments
       await api.post('/notifications/send', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -251,9 +293,11 @@ export default function NotificationsPage() {
   };
 
   return (
+    // COLOR_THEME: Main page wrapper background is #002147 for dark mode
     <div className="space-y-8 pb-12 overflow-y-auto h-full pr-6 dark:bg-[#002147] dark:text-gray-100 p-6 transition-colors">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-white/10 pb-8 gap-4">
         <div>
+          {/* COLOR_THEME: Header highlighted with var(--terra-emerald) */}
           <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-[var(--terra-emerald)]">Communication Hub</h1>
           <p className="text-muted-foreground mt-1 text-base">
             Securely exchange messages and multi-document attachments.
@@ -262,6 +306,7 @@ export default function NotificationsPage() {
         
         <div className="flex gap-3">
           {activeTab !== 'sent' && (
+            // COLOR_THEME: Clear Inbox button uses light red styling highlights
             <Button variant="outline" onClick={handleClearAll} className="gap-2 rounded-xl h-11 px-5 border-red-200 text-red-600 hover:bg-red-50">
               <Trash2 className="w-4 h-4" /> Clear Inbox
             </Button>
@@ -269,6 +314,7 @@ export default function NotificationsPage() {
 
           <Dialog open={isNewMsgOpen} onOpenChange={(val) => { setIsNewMsgOpen(val); if(!val) setAttachments([]); }}>
             <DialogTrigger asChild>
+              {/* COLOR_THEME: New Message CTA uses emerald background palette */}
               <Button className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-emerald-500/20">
                 <Send className="w-4 h-4" /> New Message
               </Button>
@@ -347,6 +393,7 @@ export default function NotificationsPage() {
                 </div>
               </div>
               <DialogFooter>
+                {/* COLOR_THEME: Primary message send button highlighted in Emerald */}
                 <Button onClick={handleCreateNewMsg} className="bg-[var(--terra-emerald)] text-white h-11 px-8 rounded-xl shadow-lg shadow-emerald-500/20">
                   Send Now
                 </Button>
@@ -360,6 +407,7 @@ export default function NotificationsPage() {
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex p-1 bg-muted rounded-xl w-full md:w-auto overflow-x-auto">
           {tabs.map((tab) => (
+            /* COLOR_THEME: Selection buttons utilize dynamic background highlights including emerald & navy combinations */
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -393,6 +441,7 @@ export default function NotificationsPage() {
           <div className="divide-y divide-border/50">
             <AnimatePresence mode="popLayout">
               {filteredNotifications.map((n) => (
+                /* COLOR_THEME: Unread notifications highlighted with soft green ring border & background */
                 <motion.div 
                   key={n._id} 
                   initial={{ opacity: 0, x: -20 }}
@@ -405,6 +454,7 @@ export default function NotificationsPage() {
                 >
                   <div className="relative">
                     <Avatar className="w-12 h-12 border-2 border-white shadow-sm shrink-0">
+                      {/* BACKEND_CONNECTION: Profile pictures fetched dynamically from backend upload folders */}
                       <AvatarImage src={(() => {
                         const targetUser = activeTab === 'sent' ? n.recipient : n.sender;
                         if (!targetUser) return "https://api.dicebear.com/7.x/avataaars/svg?seed=System";
@@ -417,12 +467,12 @@ export default function NotificationsPage() {
                         const isAbsolute = targetUser.profilePic.startsWith('http') || targetUser.profilePic.startsWith('data:');
                         let avatarUrl = isAbsolute ? targetUser.profilePic : `http://localhost:5001/${targetUser.profilePic.startsWith('/') ? targetUser.profilePic.substring(1) : targetUser.profilePic}`;
                         
-                        // Dynamically apply Cloudinary cropping transformations c_thumb, g_face, w_200, h_200
                         if (avatarUrl.includes("cloudinary.com") && avatarUrl.includes("/image/upload/")) {
                           avatarUrl = avatarUrl.replace("/image/upload/", "/image/upload/c_thumb,g_face,w_200,h_200/");
                         }
                         return avatarUrl;
                       })()} />
+                      {/* COLOR_THEME: Avatar fallback matches primary navy styling */}
                       <AvatarFallback className="bg-[var(--terra-navy)] text-white text-xs">
                         {(activeTab === 'sent' ? n.recipient : n.sender)?.firstName?.[0] || "S"}{(activeTab === 'sent' ? n.recipient : n.sender)?.lastName?.[0] || "Y"}
                       </AvatarFallback>
@@ -431,9 +481,11 @@ export default function NotificationsPage() {
                   <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
+                        {/* COLOR_THEME: Hover text utilizes emerald variable */}
                         <span className="font-bold text-[#002147] dark:text-gray-100 group-hover:text-[var(--terra-emerald)] transition-colors text-sm">
                           {activeTab === 'sent' ? `To: ${n.recipient?.firstName} ${n.recipient?.lastName}` : n.sender ? `${n.sender.firstName} ${n.sender.lastName}` : "System"}
                         </span>
+                        {/* COLOR_THEME: Badges styled using alert/info background overlays */}
                         <Badge variant="outline" className={`text-[9px] h-3.5 uppercase font-bold border-0 ${
                           n.type === 'unblock_request' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                         }`}>
@@ -445,12 +497,13 @@ export default function NotificationsPage() {
                         {formatDateTime(n.createdAt)}
                       </div>
                     </div>
+                    {/* COLOR_THEME: Subject header colored in Primary Navy/Emerald */}
                     <p className="text-sm font-bold text-[var(--terra-navy)] dark:text-emerald-400">{n.title}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-2xl">
                       {n.message}
                     </p>
 
-                    {/* Multiple Attachments List */}
+                    {/* COLOR_THEME: Attachment item border turns emerald on hover */}
                     {n.attachments && n.attachments.length > 0 && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {n.attachments.map((path, idx) => (
@@ -469,6 +522,7 @@ export default function NotificationsPage() {
                     )}
 
                     <div className="pt-3 flex gap-3 opacity-0 group-hover:opacity-100 transition-all transform translate-y-1 group-hover:translate-y-0">
+                      {/* COLOR_THEME: Reply CTA button borders and text color are emerald themed */}
                       {activeTab !== 'sent' && (
                         <Button onClick={() => handleReplyClick(n)} variant="outline" size="sm" className="h-8 text-[11px] font-bold gap-2 rounded-lg border-[var(--terra-emerald)] text-[var(--terra-emerald)] hover:bg-emerald-50">
                           <Reply className="w-3 h-3" /> Reply
@@ -489,6 +543,7 @@ export default function NotificationsPage() {
                         </Button>
                       )}
 
+                      {/* COLOR_THEME: Delete action is colored in red */}
                       <Button onClick={() => handleAction(n._id, 'delete')} variant="ghost" size="sm" className="h-8 text-[11px] rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="w-3 h-3" /></Button>
                     </div>
                   </div>
@@ -499,6 +554,7 @@ export default function NotificationsPage() {
             {filteredNotifications.length === 0 && (
               <div className="py-20 text-center text-muted-foreground">
                 <Mail className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                {/* COLOR_THEME: Inner empty text styled with Navy color */}
                 <p className="text-lg font-bold font-['Syne'] text-[#002147]">No messages here</p>
                 <p className="text-sm">Your {activeTab} folder is currently empty.</p>
               </div>
@@ -541,6 +597,7 @@ export default function NotificationsPage() {
           </div>
           <DialogFooter className="border-t pt-4">
             <Button variant="ghost" onClick={() => { setIsReplyOpen(false); setAttachments([]); }}>Cancel</Button>
+            {/* COLOR_THEME: Action submit button styled in Navy #002147 */}
             <Button onClick={sendReply} className="bg-[var(--terra-navy)] text-white gap-2 h-11 px-8 rounded-xl">Send Reply <ArrowRight className="w-4 h-4" /></Button>
           </DialogFooter>
         </DialogContent>

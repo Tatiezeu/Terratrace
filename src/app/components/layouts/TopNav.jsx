@@ -1,3 +1,4 @@
+// BEHAVIOR: Renders the top navigation header bar containing a live clock, online badge, notification system bell, theme toggle, and logged-in user profile options.
 import { useState, useEffect } from "react";
 import { Moon, Sun, Bell, Check, Trash2, Reply, Wifi, LogOut } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -12,8 +13,10 @@ import {
 } from "../ui/popover";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+// BACKEND_CONNECTION: Axios instance to query/delete/update notifications on the backend server
 import api from "../../../utils/api";
 import { useQueryClient } from "@tanstack/react-query";
+// BACKEND_CONNECTION: Custom query hook to retrieve user's notification list
 import { useNotifications } from "../../../hooks/useNotificationsData";
 
 export function TopNav({ user, onRoleChange, onLogout }) {
@@ -22,9 +25,11 @@ export function TopNav({ user, onRoleChange, onLogout }) {
   const queryClient = useQueryClient();
 
   // ─── Notifications via TanStack Query (auto-refresh every 30s via staleTime) ───
+  // BACKEND_CONNECTION: Custom query fetches user notifications in real-time
   const { data: notifications = [] } = useNotifications();
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
+  // BEHAVIOR: Updates clock timer display every second
   useEffect(() => {
     const timer = setInterval(() => {
       setTime(new Date());
@@ -32,6 +37,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
     return () => clearInterval(timer);
   }, []);
 
+  // BACKEND_CONNECTION: PATCH /notifications/:id/status - Updates all unread notifications to 'read' state in the database
   const markAllAsRead = async () => {
     try {
       await Promise.all(
@@ -40,22 +46,26 @@ export function TopNav({ user, onRoleChange, onLogout }) {
           .map(n => api.patch(`/notifications/${n._id}/status`, { status: 'read' }))
       );
       toast.success("All notifications marked as read");
+      // BEHAVIOR: Triggers background refresh of notification queries
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to mark as read");
     }
   };
 
+  // BACKEND_CONNECTION: DELETE /notifications - Deletes all notifications for the user
   const clearAll = async () => {
     try {
       await api.delete('/notifications');
       toast.success("Cleared all notifications");
+      // BEHAVIOR: Wipes notifications locally and triggers refetch
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     } catch (err) {
       toast.error("Failed to clear notifications");
     }
   };
 
+  // BACKEND_CONNECTION: PATCH or DELETE /notifications/:id - Marks read or deletes a single notification
   const handleAction = async (id, action) => {
     try {
       if (action === 'read') {
@@ -75,11 +85,13 @@ export function TopNav({ user, onRoleChange, onLogout }) {
     <motion.header 
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
+      // COLOR_THEME: Styled with white background for light mode and blue/navy (#001529) for dark mode
       className="h-20 bg-white/80 dark:bg-[#001529]/90 backdrop-blur-md border-b border-border px-8 flex items-center justify-between sticky top-0 z-50 transition-colors"
     >
       <div className="flex items-center gap-6">
         {/* Live Clock */}
         <div className="hidden md:flex flex-col">
+          {/* COLOR_THEME: Uses Syne font and Terra Navy style color */}
           <span className="text-xl font-bold font-['Syne'] text-[var(--terra-navy)] dark:text-white">
             {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
@@ -89,6 +101,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
         </div>
 
         {/* System Online Badge */}
+        {/* COLOR_THEME: Styled in Emerald green theme indicating online connection */}
         <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -106,6 +119,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
             <button className="relative p-2.5 rounded-xl hover:bg-accent transition-colors group">
               <Bell className="w-5 h-5 text-foreground group-hover:scale-110 transition-transform" />
               {unreadCount > 0 && (
+                // COLOR_THEME: Unread notification badge styled in vibrant red
                 <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 border-2 border-white dark:border-slate-900 rounded-full flex items-center justify-center text-[8px] text-white font-bold animate-pulse">
                   {unreadCount}
                 </span>
@@ -113,6 +127,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-80 p-0 rounded-2xl overflow-hidden border-none shadow-2xl mr-4">
+            {/* COLOR_THEME: Popover header uses Terra Navy color theme */}
             <div className="bg-[var(--terra-navy)] p-4 text-white flex justify-between items-center">
               <div>
                 <h3 className="font-bold font-['Syne']">Notifications</h3>
@@ -132,6 +147,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
                 notifications.slice(0, 10).map((n) => (
                   <div 
                     key={n._id} 
+                    // COLOR_THEME: Unread list items highlighted in soft emerald/green tint
                     className={`p-4 flex gap-3 hover:bg-accent/30 transition-colors relative group/item ${n.status === 'unread' ? "bg-emerald-50/40 dark:bg-emerald-950/20" : ""}`}
                   >
                     <div className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.status === 'unread' ? "bg-emerald-500" : "bg-transparent"}`} />
@@ -142,6 +158,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
                         {new Date(n.createdAt).toLocaleDateString()} {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
+                    {/* BEHAVIOR: Hover triggers options menu for notification processing */}
                     <div className="flex flex-col gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
                       <Link to="/dashboard/notifications" className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950 rounded text-blue-500" title="Reply">
                         <Reply className="w-3.5 h-3.5" />
@@ -165,6 +182,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
               )}
             </div>
             {notifications.length > 0 && (
+              // COLOR_THEME: Uses Terra Emerald styled text for notification redirects
               <Link to="/dashboard/notifications" className="block w-full py-3 text-center text-xs font-bold text-[var(--terra-emerald)] hover:bg-accent border-t border-border/50 bg-white dark:bg-slate-800">
                 View All Messages →
               </Link>
@@ -186,6 +204,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
 
         {/* User Profile + Logout */}
         <div className="flex items-center gap-3 pl-4 border-l border-border">
+          {/* COLOR_THEME: Uses Ring highlight in Terra Emerald theme */}
           <Avatar className="w-10 h-10 ring-2 ring-[var(--terra-emerald)] ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatar} alt={user.name} />
             <AvatarFallback className="bg-[var(--terra-navy)] text-white font-semibold">
@@ -196,6 +215,7 @@ export function TopNav({ user, onRoleChange, onLogout }) {
             <span className="text-sm font-bold text-[var(--terra-navy)] dark:text-white leading-tight">
               {user.name}
             </span>
+            {/* COLOR_THEME: Uses Terra Emerald text style for user roles */}
             <span className="text-[10px] text-[var(--terra-emerald)] font-black uppercase tracking-widest">
               {user.role}
             </span>

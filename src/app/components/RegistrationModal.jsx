@@ -1,9 +1,11 @@
+// BEHAVIOR: Modal dialog handling new client registration, using react-hook-form for front-end verification checks.
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, CheckCircle2, Mail, Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 export default function RegistrationModal({ isOpen, onClose }) {
+  // BEHAVIOR: Local state to cache profile picture previews
   const [profilePreview, setProfilePreview] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const {
@@ -16,8 +18,10 @@ export default function RegistrationModal({ isOpen, onClose }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // BEHAVIOR: Watches password inputs in real-time to compare with confirmation password
   const password = watch('password');
 
+  // BEHAVIOR: Reads uploaded avatar files and converts to base64 for instant preview rendering
   const handleProfilePictureChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -29,6 +33,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
     }
   };
 
+  // BACKEND_CONNECTION: Simulates dispatching new user credentials to database registration endpoint
   const onSubmit = (data) => {
     console.log('Registration data:', data);
     setIsSubmitted(true);
@@ -85,12 +90,14 @@ export default function RegistrationModal({ isOpen, onClose }) {
                   >
                     <CheckCircle2 className="w-12 h-12 text-green-600" />
                   </motion.div>
+                  {/* COLOR_THEME: Displays title in Terra Navy text style */}
                   <h3 className="text-3xl text-[#002147] mb-4" style={{ fontFamily: 'var(--font-display)' }}>
                     Registration Successful!
                   </h3>
                   <p className="text-gray-600 text-lg mb-6">
                     We've sent a verification email to your inbox.
                   </p>
+                  {/* COLOR_THEME: Action badge styled with soft blue backgrounds */}
                   <div className="flex items-center gap-3 px-6 py-3 bg-blue-50 rounded-full">
                     <Mail className="w-5 h-5 text-blue-600" />
                     <span className="text-blue-600">Check your email to verify your account</span>
@@ -99,6 +106,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
               ) : (
                 <>
                   {/* Header */}
+                  {/* COLOR_THEME: Header section styled in a gradient of Terra Navy to blue-700 */}
                   <div className="bg-gradient-to-br from-[#002147] to-[#003d7a] p-8 rounded-t-3xl">
                     <motion.div
                       initial={{ opacity: 0, y: -20 }}
@@ -136,6 +144,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                           onChange={handleProfilePictureChange}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
+                        {/* COLOR_THEME: Camera upload indicator badge styled in Terra Gold */}
                         <div className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-lg border-2 border-white">
                           <Upload className="w-4 h-4 text-white" />
                         </div>
@@ -145,6 +154,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                     {/* Name Fields */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="firstName" className="block text-[#002147] mb-2">
                           First Name *
                         </label>
@@ -152,6 +162,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                           type="text"
                           id="firstName"
                           {...register('firstName', { required: 'First name is required' })}
+                          // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                           placeholder="John"
                         />
@@ -161,6 +172,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                       </div>
 
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="lastName" className="block text-[#002147] mb-2">
                           Last Name *
                         </label>
@@ -168,6 +180,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                           type="text"
                           id="lastName"
                           {...register('lastName', { required: 'Last name is required' })}
+                          // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                           placeholder="Doe"
                         />
@@ -179,6 +192,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
                     {/* Email */}
                     <div>
+                      {/* COLOR_THEME: Labels colored in Terra Navy */}
                       <label htmlFor="email" className="block text-[#002147] mb-2">
                         Email Address *
                       </label>
@@ -192,6 +206,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                             message: 'Invalid email address',
                           },
                         })}
+                        // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                         placeholder="john@example.com"
                       />
@@ -203,12 +218,14 @@ export default function RegistrationModal({ isOpen, onClose }) {
                     {/* Gender and Date of Birth */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="gender" className="block text-[#002147] mb-2">
                           Gender *
                         </label>
                         <select
                           id="gender"
                           {...register('gender', { required: 'Gender is required' })}
+                          // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                         >
                           <option value="">Select Gender</option>
@@ -222,6 +239,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                       </div>
 
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="dateOfBirth" className="block text-[#002147] mb-2">
                           Date of Birth *
                         </label>
@@ -229,6 +247,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                           type="date"
                           id="dateOfBirth"
                           {...register('dateOfBirth', { required: 'Date of birth is required' })}
+                          // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                           className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                         />
                         {errors.dateOfBirth && (
@@ -239,6 +258,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
                     {/* Phone Number */}
                     <div>
+                      {/* COLOR_THEME: Labels colored in Terra Navy */}
                       <label htmlFor="phoneNumber" className="block text-[#002147] mb-2">
                         Phone Number *
                       </label>
@@ -252,6 +272,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                             message: 'Invalid phone number',
                           },
                         })}
+                        // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300"
                         placeholder="+237 6 XX XX XX XX"
                       />
@@ -263,6 +284,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                     {/* Password Fields */}
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="password" className="block text-[#002147] mb-2">
                           Password *
                         </label>
@@ -277,6 +299,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                                 message: 'Password must be at least 8 characters',
                               },
                             })}
+                            // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300 pr-12"
                             placeholder="••••••••"
                           />
@@ -294,6 +317,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                       </div>
 
                       <div>
+                        {/* COLOR_THEME: Labels colored in Terra Navy */}
                         <label htmlFor="confirmPassword" className="block text-[#002147] mb-2">
                           Confirm Password *
                         </label>
@@ -305,6 +329,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                               required: 'Please confirm your password',
                               validate: (value) => value === password || 'Passwords do not match',
                             })}
+                            // COLOR_THEME: Form input outlines focus styling in Terra Gold (#D4AF37)
                             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:border-transparent transition-all duration-300 pr-12"
                             placeholder="••••••••"
                           />
@@ -327,6 +352,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
                       type="submit"
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
+                      // COLOR_THEME: Button background styled with linear gradient from Gold to Yellow-Gold and text in Terra Navy
                       className="w-full py-4 bg-gradient-to-r from-[#D4AF37] to-[#F4C430] text-[#002147] rounded-xl hover:shadow-xl transition-all duration-300 mt-8"
                     >
                       <span className="tracking-wide">Sign Up</span>
@@ -334,6 +360,7 @@ export default function RegistrationModal({ isOpen, onClose }) {
 
                     <p className="text-center text-gray-600 text-sm">
                       Already have an account?{' '}
+                      {/* COLOR_THEME: Login redirect link colored in Terra Gold */}
                       <a href="#" className="text-[#D4AF37] hover:underline">
                         Login here
                       </a>

@@ -1,6 +1,10 @@
+// BEHAVIOR: Custom hooks for managing user profile querying and mutations using TanStack Query.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+// BACKEND_CONNECTION: Axios API helper for backend requests
 import api from '../utils/api';
+// BEHAVIOR: Auth context provider hook to update state in the navigation and layout components
 import { useAuth } from '../context/AuthContext';
+// BEHAVIOR: Local cache helper to get and set fallback values in localStorage
 import { getCachedData, setCachedData } from '../utils/cache';
 
 /**
@@ -8,25 +12,32 @@ import { getCachedData, setCachedData } from '../utils/cache';
  * Displays latest cached information and triggers background updates reactively.
  */
 export const useProfile = () => {
+  // BEHAVIOR: Queries current user's profile details
   return useQuery({
+    // BEHAVIOR: Profile query key identifier
     queryKey: ['profile'],
+    // BACKEND_CONNECTION: GET /users/me - Syncs current user profile details from the database
     queryFn: async () => {
       const response = await api.get('/users/me');
       if (!response.data.success) {
         throw new Error('Failed to fetch profile data');
       }
       const data = response.data.data;
+      // BEHAVIOR: Caches profile data segment locally
       setCachedData('profile', data);
       return data;
     },
+    // BEHAVIOR: Supplies initial profile cache from localStorage
     initialData: () => {
       const cached = getCachedData('profile');
       return cached?.data;
     },
+    // BEHAVIOR: Supplies cache timestamp
     initialDataUpdatedAt: () => {
       const cached = getCachedData('profile');
       return cached?.timestamp;
     },
+    // BEHAVIOR: Stale time of 5 minutes. User profiles update infrequently
     staleTime: 5 * 60 * 1000, // 5 minutes cache stale time
     refetchOnWindowFocus: false,
   });
@@ -37,6 +48,7 @@ export const useProfile = () => {
  * Used as the guaranteed fallback when Cloudinary is not configured.
  */
 const fileToBase64 = (file) => {
+  // BEHAVIOR: Standard FileReader promise wrapper for base64 encoding
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result);
@@ -56,6 +68,7 @@ export const useUpdateProfile = () => {
   const queryClient = useQueryClient();
   const { updateUser } = useAuth();
 
+  // BEHAVIOR: Exposes profile modification mutation
   return useMutation({
     mutationFn: async ({ userData, selectedFile }) => {
       let profilePicUrl = userData.profilePic;
@@ -73,6 +86,7 @@ export const useUpdateProfile = () => {
             formData.append('file', selectedFile);
             formData.append('upload_preset', uploadPreset);
 
+            // BACKEND_CONNECTION: POST to Cloudinary API to host user avatars on a CDN
             const cloudinaryResponse = await fetch(
               `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
               { method: 'POST', body: formData }
@@ -100,6 +114,7 @@ export const useUpdateProfile = () => {
             if (userData.phone) localFormData.append('phone', userData.phone);
             localFormData.append('profilePic', selectedFile);
 
+            // BACKEND_CONNECTION: PATCH /users/update-me - Submits multipart form-data to local Node server
             const localResponse = await api.patch('/users/update-me', localFormData, {
               headers: { 'Content-Type': 'multipart/form-data' },
             });
@@ -139,6 +154,7 @@ export const useUpdateProfile = () => {
         profilePicUrl?.startsWith('http') ? 'URL' : 'unchanged'
       );
 
+      // BACKEND_CONNECTION: PATCH /users/update-me - Submits JSON payload to update fields in MongoDB
       const response = await api.patch('/users/update-me', payload);
       if (!response.data.success) {
         throw new Error('Failed to update profile metadata');
@@ -148,11 +164,13 @@ export const useUpdateProfile = () => {
 
     onSuccess: (updatedUser) => {
       // Force immediate cache invalidation so ProfilePage re-fetches fresh data
+      // BEHAVIOR: Invalidates profile queries in React Query cache client
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.setQueryData(['profile'], updatedUser);
       setCachedData('profile', updatedUser);
 
       // Instantly synchronize top navigation layout state without waiting for refetch
+      // BEHAVIOR: Propagates changes to the Auth Context provider
       updateUser(updatedUser);
 
       console.log('[useUpdateProfile] Profile update success. profilePic stored:', 

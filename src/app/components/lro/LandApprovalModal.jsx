@@ -1,3 +1,4 @@
+// BEHAVIOR: Modal dialog allowing Land Registry Officers (LROs) to review, preview certified files, and execute the final land transfer authorization.
 import { useState } from "react";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
 
   if (!plot) return null;
 
+  // BEHAVIOR: Approves the land transfer (mocks transaction confirmation workflow)
   const handleApprove = () => {
     setLoading(true);
     setTimeout(() => {
@@ -45,10 +47,12 @@ export function LandApprovalModal({ plot, open, onClose }) {
     }, 1500);
   };
 
+  // BEHAVIOR: Sets target document name to trigger preview viewport sub-dialog
   const handlePreview = (docName) => {
     setPreviewDoc(docName);
   };
 
+  // BEHAVIOR: Requests DOM full-screen mode on the certificate viewer div element
   const handleFullScreen = () => {
     const element = document.getElementById("lro-document-viewer");
     if (element) {
@@ -65,6 +69,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
+        {/* COLOR_THEME: Styled with white overlay background and transparent backdrop blur */}
         <DialogContent className="max-w-2xl bg-white/95 backdrop-blur-md border-white/20 shadow-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -72,6 +77,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
                 <ShieldCheck className="w-6 h-6 text-emerald-600" />
               </div>
               <div>
+                {/* COLOR_THEME: Title uses Syne Font family and Terra Navy color code */}
                 <DialogTitle className="font-['Syne'] text-xl text-[#002147]">Final Registry Approval</DialogTitle>
                 <DialogDescription>Validate and finalize ownership transfer on blockchain</DialogDescription>
               </div>
@@ -99,6 +105,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground">Proposed Owner</span>
+                  {/* COLOR_THEME: Bold name label colored in Terra Navy */}
                   <span className="font-bold text-[var(--terra-navy)]">Ousmanou Bello</span>
                 </div>
               </div>
@@ -106,6 +113,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
 
             {/* Right Column: Verification Status */}
             <div className="space-y-4">
+              {/* COLOR_THEME: Checklist segment styled in soft green color scheme */}
               <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4">
                 <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider mb-3">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -129,6 +137,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
 
               <div className="space-y-3">
                 <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground px-1">Evidence & Docs</h4>
+                {/* BEHAVIOR: Launches preview viewport modal on click */}
                 <button 
                   onClick={() => handlePreview("Certified Deed of Sale.pdf")}
                   className="w-full flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-emerald-50 hover:border-emerald-200 transition-all text-xs group"
@@ -139,6 +148,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
                   </div>
                   <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
                 </button>
+                {/* BEHAVIOR: Launches preview viewport modal on click */}
                 <button 
                   onClick={() => handlePreview("Public Notice Report.pdf")}
                   className="w-full flex items-center justify-between p-3 rounded-xl border bg-white hover:bg-emerald-50 hover:border-emerald-200 transition-all text-xs group"
@@ -153,6 +163,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
             </div>
           </div>
 
+          {/* COLOR_THEME: Yellow styled caution/warning dialog segment */}
           <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 flex gap-3 text-[11px] text-amber-900/70">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
             <p>
@@ -162,6 +173,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
 
           <DialogFooter className="gap-2 mt-2">
             <Button variant="ghost" onClick={onClose} className="rounded-xl h-11">Cancel</Button>
+            {/* COLOR_THEME: Action trigger styled in Terra Navy background */}
             <Button 
               onClick={handleApprove} 
               className="flex-1 bg-[var(--terra-navy)] hover:bg-blue-900 text-white h-11 font-bold rounded-xl shadow-lg shadow-blue-500/20"
@@ -181,6 +193,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
       {/* Document Preview Sub-Dialog */}
       <Dialog open={!!previewDoc} onOpenChange={() => setPreviewDoc(null)}>
         <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
+          {/* COLOR_THEME: Header section styled in deep navy background */}
           <div className="bg-[#002147] text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-1.5 bg-white/10 rounded-lg">
@@ -244,6 +257,7 @@ export function LandApprovalModal({ plot, open, onClose }) {
           </div>
           <div className="p-4 bg-white border-t flex justify-end gap-3">
              <Button variant="outline" onClick={() => setPreviewDoc(null)} className="rounded-xl">Close Preview</Button>
+             {/* COLOR_THEME: Action trigger styled in Terra Navy background */}
              <Button onClick={handleFullScreen} className="bg-[var(--terra-navy)] text-white gap-2 rounded-xl">
                <ExternalLink className="w-4 h-4" /> Open Full Screen
              </Button>

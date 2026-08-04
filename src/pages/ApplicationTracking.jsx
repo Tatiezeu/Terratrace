@@ -1,7 +1,9 @@
+// BEHAVIOR: Renders a dossier tracker interface for landowners and clients, displaying stepper status tracking for land transfer requests.
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import PaymentPage from './PaymentPage';
+// BEHAVIOR: UI Icons representing files, maps, users, checkmarks, clocks, and warning messages
 import { 
   FileSearch, 
   MapPin, 
@@ -24,6 +26,7 @@ import { Button } from '../app/components/ui/button';
 import { Input } from '../app/components/ui/input';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+// BACKEND_CONNECTION: useMyTransfers fetches transfer dossiers matching user role
 import { useMyTransfers } from '../hooks/useTransferData';
 import { 
   Dialog, 
@@ -34,23 +37,21 @@ import {
   DialogFooter
 } from '../app/components/ui/dialog';
 
-/**
- * ApplicationTracking Page Component
- * Renders a premium, comprehensive registry dashboard page for Landowners/Clients
- * to trace and monitor the detailed stepper progress of their Land Title Transfer files in real time.
- */
 export default function ApplicationTracking() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedApp, setSelectedApp] = useState(null);
-  const [clickedStep, setClickedStep] = useState({}); // Stores { [appId]: stepId }
+  // BEHAVIOR: Stores { [appId]: stepId } to display the active expanded audit check block
+  const [clickedStep, setClickedStep] = useState({}); 
 
+  // BEHAVIOR: Local state tracking array of cleared application IDs to hide them in the current view
   const [clearedAppIds, setClearedAppIds] = useState([]);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [activePaymentId, setActivePaymentId] = useState(null);
 
+  // BEHAVIOR: Load cleared application IDs from localStorage on mount/user-change
   useEffect(() => {
     if (user) {
       const saved = localStorage.getItem(`cleared_client_applications_${user._id || user.id}`);
@@ -59,6 +60,7 @@ export default function ApplicationTracking() {
   }, [user]);
 
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
+  // BACKEND_CONNECTION: Queries user's associated transfers via useMyTransfers hook
   const { data: rawTransfers = [], isLoading: loading, refetch: refetchTransfers } = useMyTransfers();
 
   // ─── Normalize backend status enum to local display enum ─────────────────
@@ -66,7 +68,6 @@ export default function ApplicationTracking() {
     return rawTransfers.map(app => ({
       id: app._id,
       landCode: app.plot?.landCode || "Unknown Code",
-      // The current plot owner at the time of query is the registered seller/lessor
       sellerName: app.plot?.owner
         ? `${app.plot.owner.firstName} ${app.plot.owner.lastName}`
         : app.sender
@@ -89,6 +90,7 @@ export default function ApplicationTracking() {
     }));
   }, [rawTransfers]);
 
+  // BEHAVIOR: Generates static check mock logs matching stepper step details
   const getStepAuditDetails = (stepId, app) => {
     const auditLogs = {
       0: {
@@ -136,10 +138,6 @@ export default function ApplicationTracking() {
     return auditLogs[stepId];
   };
 
-  // Filter application files based on search query and status filter.
-  // NOTE: The backend already scopes results per user role (sender/receiver for clients,
-  // assigned notary for Notary officers, assigned LRO for registry officers).
-  // No additional authorization filtering is needed here.
   const filteredApps = applications.filter((app) => {
     const matchesSearch = 
       app.landCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -156,6 +154,7 @@ export default function ApplicationTracking() {
     return filteredApps.filter((app) => !clearedAppIds.includes(app.id));
   }, [filteredApps, clearedAppIds]);
 
+  // BEHAVIOR: Clear visible applications from layout, persisting exclusion list in localStorage
   const handleClearAllApps = () => {
     const idsToClear = visibleApps.map((a) => a.id);
     const updated = [...new Set([...clearedAppIds, ...idsToClear])];
@@ -171,7 +170,6 @@ export default function ApplicationTracking() {
     return applications.filter((app) => !clearedAppIds.includes(app.id));
   }, [applications, clearedAppIds]);
 
-  // Calculate high-level summary metrics for display cards
   const stats = {
     total: visibleApplicationsList.length,
     pending: visibleApplicationsList.filter(a => ['pending', 'fee_pending'].includes(a.status)).length,
@@ -179,10 +177,6 @@ export default function ApplicationTracking() {
     finalized: visibleApplicationsList.filter(a => a.status === 'notary_verified').length,
   };
 
-  /**
-   * Translates raw database status keys into localized Cameroon Land Registry terminology
-   * @param {string} status - Raw status database value.
-   */
   const getStatusLabel = (status) => {
     const labels = {
       pending: "Notary Auditing",
@@ -194,14 +188,11 @@ export default function ApplicationTracking() {
     return labels[status] || status.replace('_', ' ');
   };
 
-  /**
-   * Assigns theme-matching colors to status tags
-   * @param {string} status - Raw status database value.
-   */
   const getStatusColor = (status) => {
     const colors = {
       pending: "bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
       fee_pending: "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+      // COLOR_THEME: Notice board status highlights using Gold translucent colors
       published: "bg-[#D4AF37]/10 border-[#D4AF37]/35 text-[#B8860B] dark:bg-yellow-900/20 dark:text-yellow-300",
       notary_verified: "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
       disputed: "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:text-red-300",
@@ -209,10 +200,6 @@ export default function ApplicationTracking() {
     return colors[status] || "bg-gray-100 text-gray-700";
   };
 
-  /**
-   * Standardized stepper mapping helper. Returns current step index (0-3) based on file status.
-   * @param {string} status - Raw status database value.
-   */
   const getActiveStep = (status) => {
     if (status === 'pending') return 0;
     if (status === 'fee_pending') return 1;
@@ -221,7 +208,6 @@ export default function ApplicationTracking() {
     return 0;
   };
 
-  // Get customized header title and description based on current logged in user's role
   const getHeaderDetails = () => {
     switch (user?.role) {
       case 'Admin':
@@ -254,7 +240,6 @@ export default function ApplicationTracking() {
 
   const header = getHeaderDetails();
 
-  // Get customized statistics labels based on current logged in user's role
   const getStatsLabels = () => {
     const isOfficer = ['LRO', 'Notary', 'Admin'].includes(user?.role);
     return {
@@ -268,14 +253,17 @@ export default function ApplicationTracking() {
   const statsLabels = getStatsLabels();
 
   return (
+    // COLOR_THEME: Dark mode background utilizes #002147
     <div className="space-y-8 pb-12 overflow-y-auto h-full pr-6 dark:bg-[#002147] dark:text-gray-100 p-6 transition-colors">
       
       {/* ─── Part 1: Dashboard Header ─── */}
       <div className="border-b border-white/10 pb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
+          {/* COLOR_THEME: Main title text highlighted using #002147 and var(--terra-emerald) */}
           <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-[var(--terra-emerald)]">{header.title}</h1>
           <p className="text-muted-foreground mt-1 dark:text-gray-400 italic">{header.desc}</p>
         </div>
+        {/* COLOR_THEME: Delete button has light red classes */}
         {visibleApps.length > 0 && (
           <Button 
             onClick={() => setIsClearModalOpen(true)}
@@ -290,9 +278,9 @@ export default function ApplicationTracking() {
       {/* ─── Part 2: Quick Metrics Grid ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: statsLabels.total, val: stats.total, color: "text-[#002147]", icon: <FileSearch className="w-4 h-4 text-gray-500" /> },
+          { label: statsLabels.total, val: stats.total, color: "text-[#002147] dark:text-white", icon: <FileSearch className="w-4 h-4 text-gray-500" /> },
           { label: statsLabels.pending, val: stats.pending, color: "text-blue-600", icon: <Clock className="w-4 h-4 text-blue-500" /> },
-          { label: statsLabels.published, val: stats.published, color: "text-[#B8860B]", icon: <Activity className="w-4 h-4 text-yellow-500" /> },
+          { label: statsLabels.published, val: stats.published, color: "text-[#B8860B] dark:text-yellow-500", icon: <Activity className="w-4 h-4 text-yellow-500" /> },
           { label: statsLabels.finalized, val: stats.finalized, color: "text-emerald-600", icon: <BadgeCheck className="w-4 h-4 text-emerald-500" /> }
         ].map((stat, i) => (
           <Card key={i} className="border-none shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl">
@@ -331,6 +319,7 @@ export default function ApplicationTracking() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
+                // COLOR_THEME: Dropdown focuses with emerald highlights
                 className="px-4 py-3 w-full md:w-56 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--terra-emerald)] transition-all bg-white text-sm"
               >
                 <option value="all">All File States</option>
@@ -356,7 +345,8 @@ export default function ApplicationTracking() {
         ) : visibleApps.length === 0 ? (
           <Card className="border-none shadow-sm p-12 text-center bg-white/50 dark:bg-white/5 rounded-2xl">
             <FileSearch className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-[#002147] font-['Syne']">No Applications Found</h3>
+            {/* COLOR_THEME: Header text styled with Navy color */}
+            <h3 className="text-lg font-bold text-[#002147] dark:text-white font-['Syne']">No Applications Found</h3>
             <p className="text-muted-foreground text-sm max-w-sm mx-auto mt-1">There are no active land registry transfer files matching your current search parameters.</p>
           </Card>
         ) : (
@@ -372,6 +362,7 @@ export default function ApplicationTracking() {
               >
                 
                 {/* Lateral Accent Color Banner */}
+                {/* COLOR_THEME: Accent sidebar indicator displays red, green or gold based on status */}
                 <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${
                   app.status === 'notary_verified' ? 'bg-emerald-500' :
                   app.status === 'disputed' ? 'bg-red-500' : 'bg-[#D4AF37]'
@@ -386,7 +377,8 @@ export default function ApplicationTracking() {
                         {getStatusLabel(app.status)}
                       </Badge>
                     </div>
-                    <h3 className="text-lg font-bold text-[#002147] mt-1 flex items-center gap-2">
+                    {/* COLOR_THEME: Land code and location marker uses Navy/Emerald highlights */}
+                    <h3 className="text-lg font-bold text-[#002147] dark:text-white mt-1 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-[var(--terra-emerald)]" />
                       {app.landCode}
                     </h3>
@@ -407,6 +399,7 @@ export default function ApplicationTracking() {
                     
                     {/* Stepper connecting background progress pipeline bar */}
                     <div className="absolute top-[15px] left-[12.5%] right-[12.5%] h-1 bg-gray-100 -z-10 rounded-full">
+                      {/* COLOR_THEME: Active stepper bar has gradient from Gold to Navy */}
                       <div 
                         className="h-full bg-gradient-to-r from-[#D4AF37] to-[#002147] transition-all duration-500 rounded-full" 
                         style={{ width: `${(currentStep / 3) * 100}%` }}
@@ -435,6 +428,7 @@ export default function ApplicationTracking() {
                           }}
                           className="flex flex-col items-center text-center relative cursor-pointer group/step"
                         >
+                          {/* COLOR_THEME: Circular step badges colored in Emerald, Gold, or Neutral depending on progress */}
                           <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-all duration-300 ${
                             isPast 
                               ? 'bg-emerald-500 border-emerald-500 text-white shadow-md group-hover/step:scale-115'
@@ -488,7 +482,7 @@ export default function ApplicationTracking() {
                               }`}>
                                 <CheckCircle2 className="w-2.5 h-2.5" />
                               </div>
-                              <span className={check.checked ? "line-through text-gray-400 dark:text-gray-500 font-normal" : "text-foreground font-semibold"}>{check.name}</span>
+                              <span className={check.checked ? "line-through text-gray-400 dark:text-gray-500 font-normal" : "text-foreground dark:text-white font-semibold"}>{check.name}</span>
                             </div>
                           ))}
                         </div>
@@ -503,7 +497,8 @@ export default function ApplicationTracking() {
                 </AnimatePresence>
 
                 {/* Bottom Bar: Action Trigger Drawer */}
-                <div className="flex justify-end pt-4 border-t border-gray-50 items-center gap-2">
+                <div className="flex justify-end pt-4 border-t border-gray-50 dark:border-white/10 items-center gap-2">
+                  {/* COLOR_THEME: Proceed to payment button colored in Gold */}
                   {app.rawStatus === 'Awaiting_Fee_Payment' && (
                     <Button 
                       size="sm" 
@@ -513,10 +508,11 @@ export default function ApplicationTracking() {
                       <CheckCircle2 className="w-3.5 h-3.5" /> Proceed to Payment
                     </Button>
                   )}
+                  {/* COLOR_THEME: Inspect File button changes to Navy fill on hover */}
                   <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="h-9 gap-2 text-xs font-bold text-[#002147] group-hover:bg-[#002147] group-hover:text-white rounded-xl transition-all"
+                    className="h-9 gap-2 text-xs font-bold text-[#002147] dark:text-white group-hover:bg-[#002147] group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-[#002147] rounded-xl transition-all"
                     onClick={() => setSelectedApp(app)}
                   >
                     <Info className="w-3.5 h-3.5" /> Inspect File Ledger
@@ -533,13 +529,13 @@ export default function ApplicationTracking() {
       {/* ─── Part 5: Detailed File Info Overlay/Drawer ─── */}
       {selectedApp && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-end transition-opacity">
-          <div className="w-full max-w-lg bg-white h-full shadow-2xl p-8 flex flex-col justify-between overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl p-8 flex flex-col justify-between overflow-y-auto">
             
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center justify-between border-b pb-4 dark:border-white/10">
                 <div>
                   <p className="text-[10px] text-gray-400 font-mono leading-none">REGISTRY DIRECTORY FILE</p>
-                  <h3 className="text-xl font-bold font-['Syne'] text-[#002147] mt-1">Application #{selectedApp.id}</h3>
+                  <h3 className="text-xl font-bold font-['Syne'] text-[#002147] dark:text-white mt-1">Application #{selectedApp.id}</h3>
                 </div>
                 <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setSelectedApp(null)}>
                   <Ban className="w-5 h-5" />
@@ -548,41 +544,42 @@ export default function ApplicationTracking() {
 
               <div className="space-y-4">
                 
-                <div className="p-4 bg-gray-50 rounded-xl space-y-2">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-2">
                   <p className="text-xs text-gray-400 font-bold uppercase">Land Code Identifier</p>
-                  <p className="font-mono text-sm font-bold text-[#002147]">{selectedApp.landCode}</p>
+                  <p className="font-mono text-sm font-bold text-[#002147] dark:text-white">{selectedApp.landCode}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-xl space-y-1">
+                  <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
                     <p className="text-xs text-gray-400 font-bold uppercase">Transaction Type</p>
-                    <p className="text-sm font-semibold capitalize text-[#002147]">{selectedApp.transferType}</p>
+                    <p className="text-sm font-semibold capitalize text-[#002147] dark:text-white">{selectedApp.transferType}</p>
                   </div>
-                  <div className="p-4 bg-gray-50 rounded-xl space-y-1">
+                  <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-1">
                     <p className="text-xs text-gray-400 font-bold uppercase">Assigned Notary</p>
-                    <p className="text-sm font-semibold text-[#002147]">
+                    <p className="text-sm font-semibold text-[#002147] dark:text-white">
                       {selectedApp.notaryName || "Not yet assigned"}
                     </p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-xl space-y-3">
                   <p className="text-xs text-gray-400 font-bold uppercase">Transaction Parties</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500 font-medium">Seller / Current Owner:</span>
-                      <span className="text-[#002147] font-bold">{selectedApp.sellerName}</span>
+                      <span className="text-[#002147] dark:text-white font-bold">{selectedApp.sellerName}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500 font-medium">Buyer / Transferee:</span>
-                      <span className="text-[#002147] font-bold">{selectedApp.buyerName}</span>
+                      <span className="text-[#002147] dark:text-white font-bold">{selectedApp.buyerName}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 bg-yellow-50/50 border border-yellow-100 rounded-xl space-y-2">
-                  <p className="text-xs text-yellow-700 font-bold uppercase">Cameroon Land Law Compliance (Article 17)</p>
-                  <p className="text-xs text-yellow-800 leading-relaxed italic">
+                {/* COLOR_THEME: Warning warning box uses warm yellow styling */}
+                <div className="p-4 bg-yellow-50/50 border border-yellow-100 rounded-xl space-y-2 dark:bg-yellow-950/20 dark:border-yellow-900/30">
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400 font-bold uppercase">Cameroon Land Law Compliance (Article 17)</p>
+                  <p className="text-xs text-yellow-800 dark:text-yellow-300 leading-relaxed italic">
                     All transfer deeds are subjected to a mandatory 30-day notice board publication inside MINDCAF systems to query for disputes before the final Titre Foncier is generated on the blockchain network.
                   </p>
                 </div>
@@ -590,10 +587,11 @@ export default function ApplicationTracking() {
               </div>
             </div>
 
-            <div className="pt-6 border-t mt-6 flex gap-3">
+            <div className="pt-6 border-t dark:border-white/10 mt-6 flex gap-3">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setSelectedApp(null)}>
                 Close Ledger
               </Button>
+              {/* COLOR_THEME: Export button colored in brand Navy #002147 */}
               <Button 
                 onClick={() => toast.success("Ledger document downloaded successfully")}
                 className="flex-1 bg-[#002147] hover:bg-blue-900 text-white rounded-xl"
@@ -615,6 +613,7 @@ export default function ApplicationTracking() {
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
               This action will hide all currently visible applications from your tracker view on this device. 
+              {/* COLOR_THEME: Warning box displays in light amber theme */}
               <span className="block mt-2 font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-100 dark:border-amber-900/30">
                 Note: This is a frontend-only action. Your active database titles, legal transfers, and land ownership status will remain entirely unaffected.
               </span>
@@ -628,6 +627,7 @@ export default function ApplicationTracking() {
             >
               Cancel
             </Button>
+            {/* COLOR_THEME: Confirmation button utilizes red fill */}
             <Button
               className="bg-red-600 hover:bg-red-700 text-white rounded-xl px-5 py-2 font-bold transition-all shadow-md shadow-red-600/10"
               onClick={handleClearAllApps}
@@ -640,12 +640,12 @@ export default function ApplicationTracking() {
 
       {/* ─── Part 7: Secure Payment Modal Overlay ─── */}
       <Dialog open={!!activePaymentId} onOpenChange={(open) => { if (!open) setActivePaymentId(null); }}>
-        <DialogContent className="max-w-2xl bg-white border border-gray-100 rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[95vh] focus-visible:outline-none">
-          <DialogHeader className="pb-4 border-b border-gray-100">
-            <DialogTitle className="font-['Syne'] text-xl text-[#002147] flex items-center gap-2">
+        <DialogContent className="max-w-2xl bg-white border border-gray-100 rounded-3xl p-6 shadow-2xl overflow-y-auto max-h-[95vh] focus-visible:outline-none dark:bg-slate-900 dark:border-white/10">
+          <DialogHeader className="pb-4 border-b border-gray-100 dark:border-white/10">
+            <DialogTitle className="font-['Syne'] text-xl text-[#002147] dark:text-white flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-[#D4AF37]" /> Secure Escrow Payment
             </DialogTitle>
-            <DialogDescription className="text-xs text-gray-500">
+            <DialogDescription className="text-xs text-gray-500 dark:text-gray-400">
               Complete your transaction securely using the CamPay Mobile Money Gateway.
             </DialogDescription>
           </DialogHeader>

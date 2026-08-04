@@ -27,6 +27,7 @@ import {
   X,
   MapPin,
   AlertTriangle,
+  Loader2,
   Ban
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
@@ -68,6 +69,7 @@ export default function LRODashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeStatusFilter, setActiveStatusFilter] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   
   const queryClient = useQueryClient();
 
@@ -160,6 +162,11 @@ export default function LRODashboard() {
   const [rejectionReason, setRejectionReason] = useState("");
 
   const handleAuthorize = async (requestId) => {
+    setActionLoadingId(requestId);
+    queryClient.setQueryData(["transfers"], (oldData) => {
+      if (!Array.isArray(oldData)) return oldData;
+      return oldData.map(r => r._id === requestId ? { ...r, status: 'Completed' } : r);
+    });
     try {
         const res = await api.patch(`/transfer/${requestId}/status`, { status: 'Completed' });
         if (res.data.success) {
@@ -170,12 +177,20 @@ export default function LRODashboard() {
         }
     } catch (err) {
         toast.error(err.response?.data?.message || "Authorization failed");
+        queryClient.invalidateQueries({ queryKey: ["transfers"] });
+    } finally {
+        setActionLoadingId(null);
     }
   };
 
   const handleRejectToNotary = async (requestId) => {
+    if (!rejectionReason) return toast.error("Please provide a reason");
+    setActionLoadingId(requestId);
+    queryClient.setQueryData(["transfers"], (oldData) => {
+      if (!Array.isArray(oldData)) return oldData;
+      return oldData.map(r => r._id === requestId ? { ...r, status: 'Rejected' } : r);
+    });
     try {
-        if (!rejectionReason) return toast.error("Please provide a reason");
         const res = await api.patch(`/transfer/${requestId}/status`, { 
             status: 'Rejected',
             feedback: rejectionReason
@@ -189,6 +204,9 @@ export default function LRODashboard() {
         }
     } catch (err) {
         toast.error("Rejection failed");
+        queryClient.invalidateQueries({ queryKey: ["transfers"] });
+    } finally {
+        setActionLoadingId(null);
     }
   };
 

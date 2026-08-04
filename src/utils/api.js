@@ -1,9 +1,12 @@
+// BEHAVIOR: Configures Axios with automatic base URL detection, request/response interceptors, auth token injection, and global error toasts.
 import axios from 'axios';
 import { toast } from 'sonner';
 
+// BEHAVIOR: Determines backend API server address dynamically based on frontend location (handles local vs remote networking)
 const getBaseURL = () => {
     if (typeof window !== 'undefined' && window.location) {
         const hostname = window.location.hostname;
+        // COLOR_THEME: Not directly style-related, but sets up connection point with backend
         if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
             return `http://${hostname}:5001/api`;
         }
@@ -11,6 +14,7 @@ const getBaseURL = () => {
     return 'http://localhost:5001/api';
 };
 
+// BEHAVIOR: Instantiates configured Axios client
 const api = axios.create({
     baseURL: getBaseURL(),
     withCredentials: true,
@@ -20,6 +24,7 @@ const api = axios.create({
 });
 
 // ─── Request Interceptor — inject auth token ────────────────────────────────
+// BACKEND_CONNECTION: Automatically intercepts every outgoing API request to append bearer JWT token headers
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -31,11 +36,12 @@ api.interceptors.request.use((config) => {
 });
 
 // ─── Response Interceptor — centralized success & error handling ──────────────
+// BACKEND_CONNECTION: Intercepts all backend API responses to detect and handle network failures, 401s, and 500s globally
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (!error.response) {
-            // Network error — no response received
+            // Network error — no response received from backend
             toast.error('Network error — please check your connection.', {
                 id: 'network-error',
                 duration: 4000,
@@ -46,10 +52,10 @@ api.interceptors.response.use(
         const { status } = error.response;
 
         if (status === 401) {
-            // Unauthorized — clear session and redirect to login
+            // Unauthorized / expired token — clear session data and redirect to login page
             localStorage.removeItem('token');
             localStorage.removeItem('terratrace-auth-storage');
-            // Dispatch a custom event so AuthContext can react
+            // Dispatch a custom event so AuthContext can synchronize state
             window.dispatchEvent(new CustomEvent('auth-expired'));
             // Only redirect if not already on login page
             if (!window.location.pathname.includes('/login')) {

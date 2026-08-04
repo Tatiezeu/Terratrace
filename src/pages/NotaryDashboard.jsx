@@ -21,6 +21,7 @@ import {
   FileCheck,
   ExternalLink,
   History,
+  Loader2,
   X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
@@ -52,7 +53,7 @@ export default function NotaryDashboard() {
   const queryClient = useQueryClient();
 
   // ─── Server state via TanStack Query ─────────────────────────────────────────
-  const { data: requests = [] } = useMyTransfers();
+  const { data: requests = [], isLoading: isTransfersLoading } = useMyTransfers();
   const { data: allRecipients = [] } = useRecipients();
 
   // ─── Derive LRO list from cached recipients ───────────────────────────────
@@ -60,6 +61,7 @@ export default function NotaryDashboard() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isVerificationOpen, setIsVerificationOpen] = useState(false);
@@ -86,6 +88,14 @@ export default function NotaryDashboard() {
   const [selectedLro, setSelectedLro] = useState("");
 
   const handleUpdateStatus = async (requestId, status, additionalData = {}) => {
+    setActionLoadingId(requestId);
+    
+    // OPTIMISTIC UPDATE: Update React Query cache immediately so UI shifts item instantly from untreated queue to ongoing cases!
+    queryClient.setQueryData(['transfers'], (oldData) => {
+      if (!Array.isArray(oldData)) return oldData;
+      return oldData.map(r => r._id === requestId ? { ...r, status } : r);
+    });
+
     try {
       const formData = new FormData();
       formData.append('status', status);
@@ -129,6 +139,10 @@ export default function NotaryDashboard() {
       }
     } catch (err) {
       toast.error("Action failed");
+      // Revert cache on failure
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -250,7 +264,11 @@ export default function NotaryDashboard() {
             </CardHeader>
             <CardContent className="p-0">
                <div className="divide-y divide-border/50">
-                  {pendingQueue.map(req => (
+                  {isTransfersLoading ? (
+                    <div className="p-8 text-center text-muted-foreground text-xs flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Loading incoming requests...
+                    </div>
+                  ) : pendingQueue.map(req => (
                     <div key={req._id} className="p-5 flex items-center justify-between hover:bg-white dark:hover:bg-white/5 transition-all">
                        <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-950/30 flex items-center justify-center text-blue-600 dark:text-blue-400"><FileText className="w-5 h-5" /></div>
@@ -259,10 +277,24 @@ export default function NotaryDashboard() {
                              <p className="text-[10px] text-muted-foreground dark:text-gray-400">Submitted by {req.sender.firstName} {req.sender.lastName} · {new Date(req.createdAt).toLocaleDateString()}</p>
                           </div>
                        </div>
-                       <Button onClick={() => handleUpdateStatus(req._id, 'Under_Verification')} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-lg px-4 text-xs font-bold">Initiate Verification</Button>
+                       <Button 
+                        onClick={() => handleUpdateStatus(req._id, 'Under_Verification')} 
+                        disabled={actionLoadingId === req._id}
+                        size="sm" 
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 rounded-lg px-4 text-xs font-bold active:scale-95 transition-all"
+                       >
+                        {actionLoadingId === req._id ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                            Verifying...
+                          </>
+                        ) : (
+                          "Initiate Verification"
+                        )}
+                       </Button>
                     </div>
                   ))}
-                  {pendingQueue.length === 0 && <div className="p-8 text-center text-muted-foreground text-xs italic">All new requests have been processed.</div>}
+                  {!isTransfersLoading && pendingQueue.length === 0 && <div className="p-8 text-center text-muted-foreground text-xs italic">All new requests have been processed.</div>}
                </div>
             </CardContent>
           </Card>

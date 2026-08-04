@@ -1,3 +1,4 @@
+// BEHAVIOR: Modal wizard helping landowners/clients to initiate land transfers, supporting purchases, inheritance successions, subdivisions, and direct grants.
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+// BEHAVIOR: Lucide React icon triggers
 import {
   Upload,
   Check,
@@ -34,14 +36,17 @@ import {
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import { Badge } from "../ui/badge";
+// BACKEND_CONNECTION: Custom Axios API helper
 import api from "../../../utils/api";
 import { logActivity } from "../../../utils/logger";
 import { useQueryClient } from "@tanstack/react-query";
 
+// BEHAVIOR: Sub-component processing file attachment selections, displaying loaders during conformity checks
 const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpeg,.png", multiple = false, onVerifyingChange }) => {
   const fileArray = Array.isArray(files) ? files : (files ? [files] : []);
   const [fileStatuses, setFileStatuses] = useState({});
 
+  // BEHAVIOR: Simulates file verification checks when attachments are updated
   useEffect(() => {
     const currentNames = fileArray.map(f => f?.name).filter(Boolean);
     
@@ -57,17 +62,16 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
       setFileStatuses(prev => ({ ...prev, ...newStatuses }));
       if (onVerifyingChange) onVerifyingChange(fieldKey, true);
 
-      // Simulate checking completion
+      // Fast checking completion
       newFiles.forEach(f => {
         setTimeout(() => {
           setFileStatuses(prev => {
             const updated = { ...prev, [f.name]: 'passed' };
-            // Check if any other file is still checking
             const anyChecking = Object.values(updated).some(status => status === 'checking');
             if (onVerifyingChange) onVerifyingChange(fieldKey, anyChecking);
             return updated;
           });
-        }, 1500);
+        }, 150);
       });
     }
 
@@ -78,7 +82,6 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
       setFileStatuses(prev => {
         const next = { ...prev };
         removedNames.forEach(name => delete next[name]);
-        // Notify parent of updated state
         const anyChecking = Object.values(next).some(status => status === 'checking');
         if (onVerifyingChange) onVerifyingChange(fieldKey, anyChecking);
         return next;
@@ -89,6 +92,7 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
   return (
     <div className="space-y-2">
       <Label>{label} {multiple && <span className="text-[10px] text-muted-foreground ml-1">(Multiple allowed)</span>}</Label>
+      {/* COLOR_THEME: Selection wraps styled in Terra Emerald green borders if files are loaded */}
       <label
         htmlFor={fieldKey}
         className={`flex flex-col gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${fileArray.length > 0 ? "border-[var(--terra-emerald)] bg-emerald-50/50" : "border-border hover:border-muted-foreground"
@@ -107,16 +111,16 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
           </span>
         </div>
         {fileArray.length > 0 && (
-          <div className="flex flex-col gap-3 mt-2 w-full">
+          <div className="flex flex-col gap-3 mt-2 w-full max-h-52 overflow-y-auto pr-1">
             {fileArray.map((f, i) => (
               <div 
                 key={i} 
-                className="flex flex-col gap-2 p-3 rounded-lg bg-white border border-emerald-100 hover:border-emerald-300 transition-colors group/file"
+                className="flex flex-col gap-2 p-3 rounded-lg bg-white border border-emerald-100 hover:border-emerald-300 transition-colors group/file overflow-hidden"
               >
-                <div className="flex items-center justify-between min-w-0 w-full">
-                  <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center justify-between min-w-0 w-full gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="text-xs text-emerald-900 font-bold truncate">{f.name}</span>
+                    <span className="text-xs text-emerald-900 font-bold truncate min-w-0 flex-1 break-all">{f.name}</span>
                   </div>
                   <button
                     type="button"
@@ -125,7 +129,7 @@ const UploadItem = ({ label, fieldKey, files, onChange, accept = ".pdf,.jpg,.jpe
                       e.stopPropagation();
                       onChange(fileArray.filter((_, idx) => idx !== i));
                     }}
-                    className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors"
+                    className="p-1 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -180,6 +184,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
   const [portionType, setPortionType] = useState("full"); 
   const [notaryOfficers, setNotaryOfficers] = useState([]);
   const [verifyingFiles, setVerifyingFiles] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     cniFiles: [],
     supportingDocs: [],
@@ -187,6 +192,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
     surfaceArea: "",
   });
 
+  // BACKEND_CONNECTION: GET /users/recipients?role=Notary - Queries list of available notaries from the database
   useEffect(() => {
     const fetchNotaries = async () => {
       try {
@@ -206,6 +212,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
     setPortionType("full");
     setFormData({ cniFiles: [], supportingDocs: [], notaryId: "", surfaceArea: "" });
     setVerifyingFiles({});
+    setIsSubmitting(false);
   };
 
   const handleClose = () => {
@@ -213,13 +220,20 @@ export function TransferRequestModal({ plot, open, onClose }) {
     onClose();
   };
 
+  // BACKEND_CONNECTION: POST /transfer/initiate - Initiates a new transfer request, sending CNI/evidence attachments as multipart/form-data
   const handleSubmit = async () => {
-    if (portionType === "sub" && (parseFloat(formData.surfaceArea) >= plot.area)) {
-      return toast.error("Invalid Subdivision Area", {
-        description: `Area must be strictly less than the total ${plot.area}m²`
-      });
+    if (isSubmitting) return;
+
+    if (portionType === "sub") {
+      const areaVal = parseFloat(formData.surfaceArea);
+      if (!formData.surfaceArea || isNaN(areaVal) || areaVal <= 0 || areaVal >= plot.area) {
+        return toast.error("Invalid Subdivision Area", {
+          description: `Area must be strictly greater than 0 and less than total plot area (${plot.area}m²)`
+        });
+      }
     }
 
+    setIsSubmitting(true);
     try {
       const data = new FormData();
       data.append('plotId', plot._id);
@@ -231,6 +245,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
       formData.cniFiles.forEach(f => data.append('attachments', f));
       formData.supportingDocs.forEach(f => data.append('attachments', f));
 
+      // BACKEND_CONNECTION: Calls backend initiation API route
       const response = await api.post('/transfer/initiate', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -238,6 +253,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
       if (response.data.success) {
         setStep(isDirectGrant ? 2 : 4);
         toast.success(isDirectGrant ? "Application submitted!" : "Transfer request submitted!");
+        // BEHAVIOR: Wipes query cache segments to trigger list refetching
         queryClient.invalidateQueries({ queryKey: ['transfers'] });
         queryClient.invalidateQueries({ queryKey: ['land'] });
         logActivity('Create', `User initiated ${isDirectGrant ? 'direct grant application' : 'transfer request'} for Plot '${plot.landCode}'`);
@@ -246,6 +262,8 @@ export function TransferRequestModal({ plot, open, onClose }) {
       toast.error("Submission failed", {
         description: err.response?.data?.message || "Check your network"
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -254,7 +272,8 @@ export function TransferRequestModal({ plot, open, onClose }) {
   };
 
   const isAnyFileChecking = Object.values(verifyingFiles).some(Boolean);
-  const canGoNextFromStep2 = formData.cniFiles.length > 0 && formData.supportingDocs.length > 0 && !isAnyFileChecking;
+  const isSubValid = portionType !== "sub" || (formData.surfaceArea && parseFloat(formData.surfaceArea) > 0 && parseFloat(formData.surfaceArea) < plot.area);
+  const canGoNextFromStep2 = formData.cniFiles.length > 0 && formData.supportingDocs.length > 0 && !isAnyFileChecking && isSubValid;
   const canSubmit = isDirectGrant ? canGoNextFromStep2 : (canGoNextFromStep2 && formData.notaryId);
 
   if (!plot) return null;
@@ -265,9 +284,11 @@ export function TransferRequestModal({ plot, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl sm:max-w-2xl w-full">
         <DialogHeader>
+          {/* COLOR_THEME: Dialog Title uses Syne Font family */}
           <DialogTitle className="text-xl font-bold font-['Syne']">Initiate Land Transfer</DialogTitle>
+          {/* COLOR_THEME: Displays target plot land code in Terra Navy font style */}
           <DialogDescription className="font-mono text-[var(--terra-navy)]">
             Plot: {plot.landCode} {plot.location ? `· ${plot.location}` : ""}
           </DialogDescription>
@@ -278,6 +299,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
             {(isDirectGrant ? stepLabels.slice(0, 2) : stepLabels.slice(0, 4)).map((label, i) => (
               <div key={i} className="flex items-center gap-1 flex-1">
                 <div className="flex flex-col items-center flex-1">
+                  {/* COLOR_THEME: Step circle indicator: completed segments colored in green, active segment colored in Terra Navy */}
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step > i
                         ? "bg-[var(--terra-emerald)] text-white"
@@ -291,6 +313,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
                   <p className="text-[10px] mt-1 text-center text-muted-foreground font-medium">{label}</p>
                 </div>
                 {i < (isDirectGrant ? 1 : 3) && (
+                  // COLOR_THEME: Steps line spacer: green if completed, gray if pending
                   <div className={`h-0.5 flex-1 mb-4 transition-colors ${step > i ? "bg-[var(--terra-emerald)]" : "bg-muted"}`} />
                 )}
               </div>
@@ -303,6 +326,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
             <motion.div key="step0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
               <p className="text-sm text-muted-foreground">How is this land being transferred to you?</p>
               <div className="grid grid-cols-2 gap-4">
+                {/* COLOR_THEME: Purchase button wrapper: hover focus outline set to Terra Navy */}
                 <button
                   onClick={() => { setTransferType("purchase"); setStep(1); }}
                   className="group flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-border hover:border-[var(--terra-navy)] hover:bg-[var(--terra-navy)]/5 transition-all"
@@ -316,6 +340,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
                   </div>
                 </button>
 
+                {/* COLOR_THEME: Inheritance button wrapper: hover focus outline set to Terra Navy */}
                 <button
                   onClick={() => { setTransferType("inheritance"); setStep(1); }}
                   className="group flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-border hover:border-[var(--terra-navy)] hover:bg-[var(--terra-navy)]/5 transition-all"
@@ -343,6 +368,7 @@ export function TransferRequestModal({ plot, open, onClose }) {
                   <p className="text-sm text-muted-foreground">You are applying for a direct grant from the State of Cameroon.</p>
                 </div>
               </div>
+              {/* COLOR_THEME: Direct grant button styled in Terra Navy background */}
               <Button onClick={() => { setTransferType("direct_grant"); setStep(1); }} className="w-full bg-[var(--terra-navy)] hover:bg-blue-900 h-12 rounded-xl text-white font-bold">
                 Start Application
               </Button>
@@ -445,10 +471,13 @@ export function TransferRequestModal({ plot, open, onClose }) {
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center py-8 text-center gap-4"
             >
+              {/* COLOR_THEME: Completed circle badge styled in soft green background */}
               <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
                 <CheckCircle2 className="w-10 h-10 text-emerald-600" />
               </div>
+              {/* COLOR_THEME: Title uses Syne Font family and Terra Navy text color */}
               <h3 className="text-xl font-bold font-['Syne'] text-[var(--terra-navy)]">Application Submitted!</h3>
+              {/* COLOR_THEME: Completion action button styled in Terra Emerald green */}
               <Button onClick={handleClose} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white w-full">
                 Done
               </Button>
@@ -459,27 +488,44 @@ export function TransferRequestModal({ plot, open, onClose }) {
         {step < (isDirectGrant ? 2 : 4) && (
           <DialogFooter className="flex gap-2 pt-2">
             {step > 0 && (
-              <Button variant="outline" onClick={() => setStep(step - 1)}>Back</Button>
+              <Button variant="outline" onClick={() => setStep(step - 1)} disabled={isSubmitting}>Back</Button>
             )}
+            {/* COLOR_THEME: Next button styled in Terra Navy background */}
             {step === 1 && !isDirectGrant && (
               <Button onClick={() => setStep(2)} className="bg-[var(--terra-navy)] text-white flex-1">Next</Button>
             )}
+            {/* COLOR_THEME: Submit or Next button styled in Terra Navy background */}
             {step === (isDirectGrant ? 1 : 2) && (
               <Button
                 onClick={() => isDirectGrant ? handleSubmit() : setStep(3)}
-                disabled={!canGoNextFromStep2}
+                disabled={!canGoNextFromStep2 || isSubmitting}
                 className="bg-[var(--terra-navy)] text-white flex-1"
               >
-                {isDirectGrant ? "Submit Application" : "Next"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  isDirectGrant ? "Submit Application" : "Next"
+                )}
               </Button>
             )}
+            {/* COLOR_THEME: Confirmation submit button styled in Terra Emerald green */}
             {step === 3 && !isDirectGrant && (
               <Button
                 onClick={handleSubmit}
-                disabled={!canSubmit}
+                disabled={!canSubmit || isSubmitting}
                 className="bg-[var(--terra-emerald)] text-white flex-1"
               >
-                Confirm &amp; Submit
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Confirm & Submit"
+                )}
               </Button>
             )}
           </DialogFooter>

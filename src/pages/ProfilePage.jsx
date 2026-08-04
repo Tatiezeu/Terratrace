@@ -1,4 +1,6 @@
+// BEHAVIOR: Profile settings page allowing users to view/edit profile details, change avatar, and update password.
 import { useState, useRef, useEffect } from "react";
+// BEHAVIOR: React icons representing fields, password toggles, and buttons
 import { 
   User, 
   Mail, 
@@ -22,14 +24,17 @@ import { toast } from "sonner";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { SpinnerLoader } from "../app/components/shared/SpinnerLoader";
+// BACKEND_CONNECTION: useProfile loads personal info; useUpdateProfile executes updates.
 import { useProfile, useUpdateProfile } from "../hooks/useProfile";
 import { logActivity } from "../utils/logger";
 
 export default function ProfilePage() {
   const { updateUser } = useAuth();
   const fileInputRef = useRef(null);
+  // BEHAVIOR: Local state holding URL/base64 of the current avatar preview
   const [profilePic, setProfilePic] = useState("https://api.dicebear.com/7.x/avataaars/svg?seed=John");
 
+  // BEHAVIOR: Local state capturing editable profile fields
   const [userData, setUserData] = useState({
     firstName: "",
     lastName: "",
@@ -40,29 +45,36 @@ export default function ProfilePage() {
     status: "active"
   });
 
+  // BEHAVIOR: Local state holding current/new password inputs
   const [passwords, setPasswords] = useState({
     currentPassword: "",
     newPassword: "",
     confirmNewPassword: ""
   });
 
+  // BEHAVIOR: Toggles for displaying passwords in cleartext
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // BACKEND_CONNECTION: GET /users/profile fetched via TanStack query
   const { data: serverUser, isLoading: pageLoading, error: fetchError } = useProfile();
+  // BACKEND_CONNECTION: PUT /users/profile mutation wrapping profile modifications
   const { mutateAsync: updateProfile, isPending: loading, error: mutationError } = useUpdateProfile();
 
+  // BEHAVIOR: Synchronizes local state whenever backend queries return fresh profile values
   useEffect(() => {
     if (serverUser) {
       setUserData(serverUser);
       if (serverUser.profilePic) {
         if (serverUser.profilePic === 'default-profile.png') {
+          // COLOR_THEME: Fallback default local assets path
           setProfilePic('http://localhost:5001/assets/default-profile.png');
         } else {
           const isAbsolute = serverUser.profilePic.startsWith('http') || serverUser.profilePic.startsWith('data:');
           let avatarUrl = isAbsolute ? serverUser.profilePic : `http://localhost:5001/${serverUser.profilePic.startsWith('/') ? serverUser.profilePic.substring(1) : serverUser.profilePic}`;
           
-          // Dynamically apply Cloudinary cropping transformations c_thumb, g_face, w_200, h_200
+          // BEHAVIOR: Dynamically apply Cloudinary cropping transformations c_thumb, g_face, w_200, h_200
           if (avatarUrl.includes("cloudinary.com") && avatarUrl.includes("/image/upload/")) {
             avatarUrl = avatarUrl.replace("/image/upload/", "/image/upload/c_thumb,g_face,w_200,h_200/");
           }
@@ -74,6 +86,7 @@ export default function ProfilePage() {
 
   const [passLoading, setPassLoading] = useState(false);
 
+  // BEHAVIOR: Triggered when user selects a file for instant preview & automatic upload save
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -87,6 +100,7 @@ export default function ProfilePage() {
       // 2. Upload and save to database instantly
       const toastId = toast.loading("Saving and uploading new profile image...");
       try {
+        // BACKEND_CONNECTION: POST /users/profile-picture multipart upload triggers here via useUpdateProfile
         const result = await updateProfile({
           userData: {
             firstName: userData.firstName,
@@ -100,7 +114,7 @@ export default function ProfilePage() {
         if (result) {
           toast.success("Profile picture updated and saved successfully!", { id: toastId });
           logActivity('Update', 'User updated profile avatar image');
-          // Dispatch custom event to notify AppLayout / TopNav to fetch user data immediately
+          // BEHAVIOR: Dispatch custom event to notify AppLayout / TopNav to fetch user data immediately
           window.dispatchEvent(new CustomEvent('auth-update'));
         }
       } catch (err) {
@@ -110,8 +124,10 @@ export default function ProfilePage() {
     }
   };
 
+  // BEHAVIOR: Triggered when user submits profile name/phone adjustments
   const handleSave = async () => {
     try {
+      // BACKEND_CONNECTION: PATCH/PUT /users/profile updating first/last name and telephone
       const result = await updateProfile({
         userData: {
           firstName: userData.firstName,
@@ -125,7 +141,7 @@ export default function ProfilePage() {
       if (result) {
         toast.success("Profile information updated successfully!");
         logActivity('Update', 'User updated profile information');
-        // Dispatch custom event to sync navbar/sidebar immediately
+        // BEHAVIOR: Dispatch custom event to sync navbar/sidebar immediately
         window.dispatchEvent(new CustomEvent('auth-update'));
       }
     } catch (err) {
@@ -133,6 +149,7 @@ export default function ProfilePage() {
     }
   };
 
+  // BEHAVIOR: Password update mutation validations and triggers
   const handleUpdatePassword = async () => {
     if (passwords.newPassword !== passwords.confirmNewPassword) {
       return toast.error("Passwords do not match");
@@ -140,6 +157,7 @@ export default function ProfilePage() {
 
     setPassLoading(true);
     try {
+      // BACKEND_CONNECTION: PATCH /users/update-password containing old and new passwords.
       const response = await api.patch('/users/update-password', {
         currentPassword: passwords.currentPassword,
         newPassword: passwords.newPassword
@@ -168,8 +186,10 @@ export default function ProfilePage() {
   }
 
   return (
+    // COLOR_THEME: Dark mode background is #002147
     <div className="space-y-8 pb-12 overflow-y-auto h-full pr-6 dark:bg-[#002147] dark:text-gray-100 p-6 transition-colors">
       <div className="border-b border-white/10 pb-8">
+        {/* COLOR_THEME: Header uses dark navy #002147 and emerald text for dark mode */}
         <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-[var(--terra-emerald)]">Profile Settings</h1>
         <p className="text-muted-foreground mt-1 dark:text-gray-400 italic">Manage your personal information and account security.</p>
       </div>
@@ -178,6 +198,7 @@ export default function ProfilePage() {
         {/* Personal Info Card */}
         <Card className="border-none shadow-sm bg-white/50 dark:bg-white/5 backdrop-blur-sm">
           <CardHeader>
+            {/* COLOR_THEME: Icon highlighted with var(--terra-emerald) */}
             <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
               <User className="w-5 h-5 text-[var(--terra-emerald)]" />
               Personal Information
@@ -191,8 +212,10 @@ export default function ProfilePage() {
             )}
             <div className="flex items-center gap-6">
               <div className="relative group">
+                {/* COLOR_THEME: Profile avatar ring color using emerald variable */}
                 <Avatar className="w-24 h-24 ring-4 ring-[var(--terra-emerald)]/20 transition-all group-hover:ring-[var(--terra-emerald)]/40">
                   <AvatarImage src={profilePic} />
+                  {/* COLOR_THEME: Fallback avatar utilizes primary navy color */}
                   <AvatarFallback className="text-2xl font-bold bg-[var(--terra-navy)] text-white">
                     {userData.firstName && userData.lastName ? `${userData.firstName[0]}${userData.lastName[0]}`.toUpperCase() : "TT"}
                   </AvatarFallback>
@@ -252,6 +275,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="pt-4 flex justify-end">
+              {/* COLOR_THEME: Button styling features emerald theme palette */}
               <Button onClick={handleSave} disabled={loading} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 px-8 text-white h-11 rounded-xl shadow-lg shadow-emerald-500/10">
                 {loading ? "Saving & Uploading..." : "Save Changes"}
               </Button>
@@ -262,6 +286,7 @@ export default function ProfilePage() {
         {/* Security & Authentication Card */}
         <Card className="border-none shadow-sm bg-white/50 dark:bg-white/5 backdrop-blur-sm">
           <CardHeader>
+            {/* COLOR_THEME: Icon colored using emerald variable */}
             <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
               <Lock className="w-5 h-5 text-[var(--terra-emerald)]" />
               Security & Authentication
@@ -273,6 +298,7 @@ export default function ProfilePage() {
                 <p className="font-semibold text-sm">Two-Factor Authentication</p>
                 <p className="text-xs text-muted-foreground">Secure your account with 2FA protection via Email.</p>
               </div>
+              {/* COLOR_THEME: Status badges styled with contextual emerald/red color ranges */}
               <Badge className={userData.twoFactorEnabled 
                 ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200 border-0 font-bold" 
                 : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-200 border-0 font-bold"}>
@@ -288,6 +314,7 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-xs text-muted-foreground">Your identity has been verified by the National Registry.</p>
               </div>
+              {/* COLOR_THEME: Verified status utilizes background emerald fill */}
               <Badge className="bg-emerald-500 text-white border-none px-4 py-1.5 uppercase tracking-wider text-[10px] font-bold rounded-full">
                 {userData.status}
               </Badge>
@@ -361,6 +388,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="flex justify-end">
+                {/* COLOR_THEME: Password update submit button styled with dark navy background */}
                 <Button 
                   onClick={handleUpdatePassword}
                   disabled={passLoading}

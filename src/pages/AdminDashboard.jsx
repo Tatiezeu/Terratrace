@@ -1,4 +1,6 @@
+// BEHAVIOR: Admin control panel dashboard. Manages registration of Notary & LRO officers, logs system audit activity, displays public state lands, and manages notifications.
 import { useState, useMemo, useEffect } from "react";
+// BEHAVIOR: Navigation & Action Icons (Building, Gavel, Database, ShieldAlert, Users, Trash)
 import {
   ShieldAlert, Users, UserPlus, Activity, Database, Search,
   ArrowUpRight, ChevronRight, Building, Gavel, X, Clock,
@@ -23,8 +25,11 @@ import {
 } from "../app/components/ui/dialog";
 
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+// BACKEND_CONNECTION: Custom query hooks to retrieve all users list
 import { useAllUsers } from "../hooks/useAdminData";
+// BACKEND_CONNECTION: Custom query hooks to retrieve all registered land plots
 import { useLandPlots } from "../hooks/useLandData";
+// BACKEND_CONNECTION: Custom query hooks to retrieve system notification objects
 import { useNotifications } from "../hooks/useNotificationsData";
 import { useAuth } from "../context/AuthContext";
 
@@ -38,10 +43,14 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
   // ─── Server state via TanStack Query ─────────────────────────────────────────
+  // BACKEND_CONNECTION: useAllUsers queries /users/all directory
   const { data: allUsers = [], refetch: refetchUsers } = useAllUsers();
+  // BACKEND_CONNECTION: useLandPlots queries /land-plots public directory
   const { data: allPlots = [] } = useLandPlots();
+  // BACKEND_CONNECTION: useNotifications queries /notifications inbox
   const { data: notifications = [] } = useNotifications();
 
+  // BACKEND_CONNECTION: GET /logs queries system-wide administrative audit logging history
   const { data: activityLogs = [], refetch: refetchLogs } = useQuery({
     queryKey: ['activity-logs'],
     queryFn: async () => {
@@ -52,6 +61,7 @@ export default function AdminDashboard() {
           const localLogsJson = localStorage.getItem('terratrace_activity_logs');
           const localLogs = localLogsJson ? JSON.parse(localLogsJson) : [];
           const allLogs = [...serverLogs, ...localLogs];
+          // Filter duplicates by log ID
           const uniqueLogs = Array.from(new Map(allLogs.map(item => [item.id || item._id, item])).values());
           uniqueLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           return uniqueLogs;
@@ -67,7 +77,7 @@ export default function AdminDashboard() {
     staleTime: 5 * 1000,
   });
 
-  // Reactive listener for log updates
+  // BEHAVIOR: Listen for custom dispatch events to reload logs in real-time
   useEffect(() => {
     const handleNewLog = () => {
       refetchLogs();
@@ -78,6 +88,7 @@ export default function AdminDashboard() {
 
   // ─── Derive filtered views from cached data ───────────────────────────────
   const officers = useMemo(() => allUsers.filter(u => u.role === "LRO" || u.role === "Notary"), [allUsers]);
+  // BEHAVIOR: Filter govt-owned public plots using the land type code "00050"
   const statePlots = useMemo(() => allPlots.filter(p => p.landType === "00050"), [allPlots]);
 
   const lroCount    = officers.filter(o => o.role === "LRO").length;
@@ -91,6 +102,7 @@ export default function AdminDashboard() {
     { label: "Log Activity",          value: 12, icon: <Activity className="w-5 h-5 text-blue-400" />, change: "Last 24h" },
   ];
 
+  // BEHAVIOR: Performs client-side filtering on names, emails, matricules, jurisdictions, and roles
   const filteredOfficers = useMemo(() => {
     const q = officerSearch.toLowerCase();
     return officers.filter(o => {
@@ -109,11 +121,14 @@ export default function AdminDashboard() {
     setIsRegisterOpen(true);
   };
 
+  // BEHAVIOR: Read / delete actions executing status changes for alert messages
   const handleNotifAction = async (id, action) => {
     try {
       if (action === 'read') {
+        // BACKEND_CONNECTION: PATCH /notifications/:id/status updates the message status to read
         await api.patch(`/notifications/${id}/status`, { status: 'read' });
       } else if (action === 'delete') {
+        // BACKEND_CONNECTION: DELETE /notifications/:id deletes notification item
         await api.delete(`/notifications/${id}`);
       }
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -125,6 +140,7 @@ export default function AdminDashboard() {
   const [clearAllConfirmOpen, setClearAllConfirmOpen] = useState(false);
   const [clearedNotifIds, setClearedNotifIds] = useState([]);
 
+  // BEHAVIOR: Load cleared notification IDs from localStorage on mount
   useEffect(() => {
     if (user) {
       const saved = localStorage.getItem(`cleared_admin_notifications_${user._id || user.id}`);
@@ -136,6 +152,7 @@ export default function AdminDashboard() {
     return notifications.filter(n => !clearedNotifIds.includes(n._id));
   }, [notifications, clearedNotifIds]);
 
+  // BEHAVIOR: Performs frontend-only notifications clear, saving hidden IDs to localStorage
   const executeClearAllNotif = () => {
     const idsToClear = visibleNotifications.map(n => n._id);
     const updated = [...new Set([...clearedNotifIds, ...idsToClear])];
@@ -150,6 +167,7 @@ export default function AdminDashboard() {
   const [clearedLogIds, setClearedLogIds] = useState([]);
   const [isClearLogsModalOpen, setIsClearLogsModalOpen] = useState(false);
 
+  // BEHAVIOR: Load cleared activity log IDs from localStorage on mount
   useEffect(() => {
     if (user) {
       const savedClearedLogs = localStorage.getItem(`cleared_logs_${user._id || user.id}`);
@@ -161,6 +179,7 @@ export default function AdminDashboard() {
     return activityLogs.filter(log => !clearedLogIds.includes(log._id || log.id));
   }, [activityLogs, clearedLogIds]);
 
+  // BEHAVIOR: Performs frontend-only activity logs clear, saving hidden log IDs to localStorage
   const handleClearAllLogs = () => {
     const idsToClear = visibleLogs.map(l => l._id || l.id);
     const updated = [...new Set([...clearedLogIds, ...idsToClear])];
@@ -180,9 +199,11 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground mt-1 text-lg">National Land Registry — Management Console</p>
         </div>
         <div className="flex gap-3">
+          {/* COLOR_THEME: LRO Creation CTA button has dark Navy background */}
           <Button onClick={() => openRegister("lro")} className="bg-[var(--terra-navy)] hover:bg-blue-900 border-0 gap-2 h-11 px-6">
             <Building className="w-4 h-4" /> Add LRO
           </Button>
+          {/* COLOR_THEME: Notary Creation CTA button has Emerald background */}
           <Button onClick={() => openRegister("notary")} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 border-0 gap-2 h-11 px-6">
             <Gavel className="w-4 h-4" /> Add Notary
           </Button>
@@ -193,6 +214,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+            {/* COLOR_THEME: Left border highlight uses emerald variable */}
             <Card className="hover:shadow-lg transition-all border-l-4 border-l-[var(--terra-emerald)]">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-4">
@@ -214,6 +236,7 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold font-['Syne']">State Land Portfolio</h2>
             <p className="text-muted-foreground text-sm">Public land plots currently owned by the Government of Cameroon</p>
           </div>
+          {/* COLOR_THEME: Government plots badge uses soft amber background styling */}
           <Badge className="bg-amber-100 text-amber-700 border-0 dark:bg-amber-900/30 dark:text-amber-400">{statePlots.length} Plots Managed</Badge>
         </div>
         
@@ -222,12 +245,14 @@ export default function AdminDashboard() {
             <motion.div key={plot._id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
               <Card className="overflow-hidden group hover:shadow-xl transition-all border-border">
                 <div className="relative h-40 overflow-hidden bg-muted">
+                  {/* BACKEND_CONNECTION: Cover image sourced from backend server uploads */}
                   <img 
                     src={plot.coverImage?.startsWith('http') ? plot.coverImage : `http://localhost:5001${plot.coverImage || '/assets/images/plots/default-plot.jpg'}`} 
                     alt={plot.landCode}
                     className="w-full h-full object-cover transition-transform group-hover:scale-105" 
                   />
                   <div className="absolute top-2 left-2">
+                    {/* COLOR_THEME: Badge uses brand Navy background */}
                     <Badge className="bg-[var(--terra-navy)] text-white border-0 text-[10px]">PUBLIC</Badge>
                   </div>
                 </div>
@@ -290,6 +315,7 @@ export default function AdminDashboard() {
                     <tr key={officer._id} className="hover:bg-accent/5 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
+                          {/* COLOR_THEME: Avatar background uses light navy tint */}
                           <div className="w-8 h-8 rounded-full bg-[var(--terra-navy)]/10 flex items-center justify-center font-bold text-[var(--terra-navy)] text-xs shrink-0">
                             {officer.firstName?.[0] || ""}{officer.lastName?.[0] || ""}
                           </div>
@@ -300,6 +326,7 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
+                        {/* COLOR_THEME: Notary role displays purple highlight, LRO displays blue highlight */}
                         <Badge variant="outline" className={`text-[10px] uppercase ${officer.role === "Notary" ? "border-purple-300 text-purple-700 bg-purple-50 dark:border-purple-700/50 dark:text-purple-400 dark:bg-purple-900/30" : "border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700/50 dark:text-blue-400 dark:bg-blue-900/30"}`}>
                           {officer.role}
                         </Badge>
@@ -308,6 +335,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 text-xs font-medium">{officer.jurisdiction}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
+                          {/* COLOR_THEME: Status dot uses green or red dynamically */}
                           <div className={`w-1.5 h-1.5 rounded-full ${officer.status === "active" ? "bg-emerald-500" : "bg-red-400"}`} />
                           <span className={`text-[10px] font-bold uppercase ${officer.status === "active" ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                             {officer.status}
@@ -325,6 +353,7 @@ export default function AdminDashboard() {
         {/* System Notifications & Logs */}
         <div className="space-y-6">
           <Card className="border-emerald-100 shadow-emerald-500/5 dark:border-emerald-900/40">
+            {/* COLOR_THEME: Notifications header highlighted with soft emerald bg */}
             <CardHeader className="pb-3 border-b border-emerald-50 bg-emerald-50/30 dark:border-emerald-900/30 dark:bg-emerald-950/20">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
@@ -333,6 +362,7 @@ export default function AdminDashboard() {
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   {visibleNotifications.filter(n => n.status === 'unread').length > 0 && (
+                    /* COLOR_THEME: Pulse alert tag colored red */
                     <Badge className="bg-red-500 text-white animate-pulse">
                       {visibleNotifications.filter(n => n.status === 'unread').length} New
                     </Badge>
@@ -397,6 +427,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-muted">
+              {/* COLOR_THEME: Header icon colored using emerald variable */}
               <CardTitle className="text-xl font-bold font-['Syne'] flex items-center gap-2">
                 <ScrollText className="w-5 h-5 text-[var(--terra-emerald)]" />
                 Log Activity
@@ -421,6 +452,7 @@ export default function AdminDashboard() {
                         : (log.time?.split(" ")[1] || "");
                       return (
                         <div key={log.id || log._id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
+                          {/* COLOR_THEME: Status border line colored green or red dynamically */}
                           <div className={cn(
                             "w-1 rounded-full shrink-0 h-12",
                             log.success || log.status === "success" ? "bg-emerald-500" : "bg-red-400"
@@ -490,16 +522,19 @@ export default function AdminDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       {/* CLEAR ALL LOGS CONFIRMATION MODAL */}
       <Dialog open={isClearLogsModalOpen} onOpenChange={setIsClearLogsModalOpen}>
         <DialogContent className="max-w-md rounded-2xl p-6 bg-white dark:bg-slate-900 border dark:border-white/10">
           <DialogHeader>
+            {/* COLOR_THEME: Warning titles colored in red */}
             <DialogTitle className="text-xl font-bold font-['Syne'] text-red-700 dark:text-red-500">Clear Activity Logs</DialogTitle>
             <DialogDescription className="dark:text-gray-400">
               Are you sure you want to clear all currently listed activity logs from your view?
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
+             {/* COLOR_THEME: Alert warning container box styled with light red styling */}
              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 text-xs text-red-700 dark:text-red-400 rounded-xl leading-relaxed">
                 <strong>Warning:</strong> This action will only remove the logs from this frontend view. It will <strong>NOT</strong> delete any audit records or security logs from the backend database.
              </div>
@@ -510,7 +545,7 @@ export default function AdminDashboard() {
                onClick={handleClearAllLogs}
                className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-11 px-6"
              >
-                Confirm Clear
+                 Confirm Clear
              </Button>
           </DialogFooter>
         </DialogContent>

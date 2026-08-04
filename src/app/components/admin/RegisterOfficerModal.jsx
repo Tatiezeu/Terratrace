@@ -1,3 +1,4 @@
+// BEHAVIOR: Modal dialog enabling administrators to register LRO or Notary officers, validating criteria with live visual feedback.
 import { useState } from "react";
 import {
   Dialog,
@@ -12,7 +13,8 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { toast } from "sonner";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+// BACKEND_CONNECTION: Axios helper instance to execute post request queries to the server backend
 import api from "../../../utils/api";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,6 +24,7 @@ export function RegisterOfficerModal({
   officerType,
 }) {
   const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -35,10 +38,14 @@ export function RegisterOfficerModal({
   const [showPassword, setShowPassword] = useState(false);
 
   // Conformity validation patterns
+  // BEHAVIOR: Regex pattern demanding exactly 5 numeric digits for the badge registration code
   const matriculePattern = /^\d{5}$/;
+  // BEHAVIOR: Regex validation pattern checking for valid email formats
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // BEHAVIOR: Regex validating standard phone structures
   const phonePattern = /^\+?[0-9\s-]{9,15}$/;
 
+  // BEHAVIOR: Evaluates fields in real-time to show checking state indicators
   const conformity = {
     names: formData.firstName.trim().length >= 2 && formData.lastName.trim().length >= 2,
     matricule: matriculePattern.test(formData.matricule),
@@ -50,18 +57,23 @@ export function RegisterOfficerModal({
 
   const isConformed = Object.values(conformity).every(Boolean);
 
+  // BACKEND_CONNECTION: POST /users/register-officer - Registers a new officer with roles LRO or Notary on the server
   const handleSubmit = async () => {
-    if (!isConformed) {
-      toast.error("Conformity Check Failed", {
-        description: "Please ensure all credentials and assignments pass the conformity check."
-      });
+    if (!isConformed || isSubmitting) {
+      if (!isConformed) {
+        toast.error("Conformity Check Failed", {
+          description: "Please ensure all credentials and assignments pass the conformity check."
+        });
+      }
       return;
     }
+    setIsSubmitting(true);
     try {
         const prefix = officerType === "lro" ? "CM" : "CH";
         const fullMatricule = `${prefix}${formData.matricule}`;
         const finalRole = officerType === "lro" ? "LRO" : "Notary";
 
+        // BACKEND_CONNECTION: Submits officer forms to the database via API post request
         const response = await api.post('/users/register-officer', {
             ...formData,
             role: finalRole,
@@ -77,6 +89,7 @@ export function RegisterOfficerModal({
               }
             );
 
+            // BEHAVIOR: Invalidates cached queries to force list updates in background
             queryClient.invalidateQueries({ queryKey: ['users', 'all'] });
             onClose();
             setFormData({
@@ -100,6 +113,8 @@ export function RegisterOfficerModal({
         toast.error("Registration failed", {
             description: err.response?.data?.message || "Internal server error"
         });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -107,6 +122,7 @@ export function RegisterOfficerModal({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
+          {/* COLOR_THEME: Header uses Syne Font family */}
           <DialogTitle className="text-2xl font-bold font-['Syne']">
             Register {officerType === "lro" ? "LRO" : "Notary"} Officer
           </DialogTitle>
@@ -258,9 +274,11 @@ export function RegisterOfficerModal({
           </div>
 
           {/* Conformity Check Status Widget */}
+          {/* COLOR_THEME: Conformity checks box styled with soft background opacity */}
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-white/5 space-y-2.5">
             <div className="flex justify-between items-center pb-2 border-b border-slate-200/50 dark:border-white/10">
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Conformity Check</span>
+              {/* COLOR_THEME: Visual checks badge: Green style if conformed, Amber if pending details */}
               <span className={`text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded-full ${
                 isConformed 
                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400" 
@@ -271,6 +289,7 @@ export function RegisterOfficerModal({
             </div>
             
             <div className="grid grid-cols-2 gap-2 text-[11px] font-medium text-muted-foreground">
+              {/* BEHAVIOR: Checks lists displaying checking states interactively */}
               <div className="flex items-center gap-1.5">
                 <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-colors duration-300 ${conformity.names ? "bg-emerald-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"}`}>
                   ✓
@@ -315,16 +334,24 @@ export function RegisterOfficerModal({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
+          {/* COLOR_THEME: Submit button styled in Terra Emerald if validated, gray if invalid */}
           <Button
             onClick={handleSubmit}
-            disabled={!isConformed}
-            className={`transition-colors duration-300 ${
-              isConformed 
-                ? "bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white" 
+            disabled={!isConformed || isSubmitting}
+            className={`transition-colors duration-300 flex items-center justify-center gap-2 ${
+              isConformed && !isSubmitting
+                ? "bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white active:scale-95" 
                 : "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
             }`}
           >
-            Register Officer
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Registering...
+              </>
+            ) : (
+              "Register Officer"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

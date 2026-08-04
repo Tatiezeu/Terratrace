@@ -2,7 +2,8 @@ import { useState } from "react";
 import {
   ShieldAlert, Mail, Users, History, Lock, CircleAlert,
   Smartphone, Database, Activity, ScrollText, Ban, Trash2,
-  CheckCircle2, UserCheck, UserX, X, AlertTriangle, Edit, Download, User, Eye, EyeOff
+  CheckCircle2, UserCheck, UserX, X, AlertTriangle, Edit, Download, User, Eye, EyeOff,
+  Bot
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../app/components/ui/card";
 import { Button } from "../app/components/ui/button";
@@ -33,6 +34,14 @@ export default function SettingsPage() {
   const [loginAttempts, setLoginAttempts] = useState("5");
   const [lockDuration, setLockDuration] = useState("30");
   const [senderEmail, setSenderEmail] = useState("security@terratrace.cm");
+  const [chatbotEnabled, setChatbotEnabled] = useState(true);
+  const [chatbotApiKey, setChatbotApiKey] = useState("");
+  const [chatbotApiKeyName, setChatbotApiKeyName] = useState("Gemini");
+  const [chatbotModel, setChatbotModel] = useState("gemini-flash-latest");
+  const [chatbotProjectNumber, setChatbotProjectNumber] = useState("");
+  const [showChatbotKey, setShowChatbotKey] = useState(false);
+  const [chatbotSystemPrompt, setChatbotSystemPrompt] = useState("");
+  const [chatbotKnowledgeBase, setChatbotKnowledgeBase] = useState("");
   const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUser, setSmtpUser] = useState("");
@@ -98,6 +107,17 @@ export default function SettingsPage() {
     };
   }, [refetchLogs]);
 
+  useEffect(() => {
+    api.get('/chatbot/training')
+      .then(res => {
+        if (res.data.success) {
+          setChatbotSystemPrompt(res.data.data.systemPrompt);
+          setChatbotKnowledgeBase(res.data.data.knowledgeBase);
+        }
+      })
+      .catch(err => console.error("Failed to load chatbot training parameters:", err));
+  }, []);
+
   const { data: serverUsers } = useServerQuery('settings_users', async () => {
     const response = await api.get('/users');
     return response.data.data.map(u => ({
@@ -138,6 +158,11 @@ export default function SettingsPage() {
       if (serverConfig.noticeDurationDays) setNoticeDurationDays(serverConfig.noticeDurationDays);
       if (serverConfig.noticeTestMode !== undefined) setNoticeTestMode(serverConfig.noticeTestMode);
       if (serverConfig.noticeTestMinutes) setNoticeTestMinutes(serverConfig.noticeTestMinutes);
+      if (serverConfig.chatbotEnabled !== undefined) setChatbotEnabled(serverConfig.chatbotEnabled);
+      if (serverConfig.chatbotApiKey) setChatbotApiKey(serverConfig.chatbotApiKey);
+      if (serverConfig.chatbotApiKeyName) setChatbotApiKeyName(serverConfig.chatbotApiKeyName);
+      if (serverConfig.chatbotModel) setChatbotModel(serverConfig.chatbotModel);
+      if (serverConfig.chatbotProjectNumber) setChatbotProjectNumber(serverConfig.chatbotProjectNumber);
 
       // CamPay & Payout Configs
       if (serverConfig.campay_app_id) setCampayAppId(serverConfig.campay_app_id);
@@ -174,6 +199,22 @@ export default function SettingsPage() {
             loading: 'Sending test email...',
             success: 'Test email sent! Check your inbox.',
             error: (err) => `Failed: ${err.response?.data?.message || 'Check console'}`
+        }
+    );
+  };
+
+  const testChatbotConnection = async () => {
+    toast.promise(
+        api.post('/config/test-chatbot', { 
+          apiKey: chatbotApiKey, 
+          provider: chatbotApiKeyName,
+          model: chatbotModel,
+          projectNumber: chatbotProjectNumber
+        }),
+        {
+            loading: 'Testing AI Chatbot connection...',
+            success: (res) => res.data?.message || 'Connection Successful!',
+            error: (err) => `Failed: ${err.response?.data?.message || 'Connection failed'}`
         }
     );
   };
@@ -319,7 +360,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="login-attempts" className="w-full space-y-6">
-        <TabsList className="bg-muted p-1 rounded-xl h-auto flex flex-wrap lg:grid lg:grid-cols-7 gap-1">
+        <TabsList className="bg-muted p-1.5 rounded-xl h-auto flex flex-wrap gap-2 w-full justify-start border border-border/40">
           <TabsTrigger value="login-attempts" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <ShieldAlert className="w-4 h-4 mr-2" /> Login Attempts
           </TabsTrigger>
@@ -340,6 +381,9 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="campay" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm lg:ml-2">
             <Smartphone className="w-4 h-4 mr-2" /> CamPay API Settings
+          </TabsTrigger>
+          <TabsTrigger value="chatbot" className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <Bot className="w-4 h-4 mr-2" /> Chatbot Settings
           </TabsTrigger>
         </TabsList>
 
@@ -921,6 +965,201 @@ export default function SettingsPage() {
                   className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-8 rounded-xl h-11 shadow-lg font-bold"
                 >
                   Save API Settings
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="chatbot">
+          <Card className="border-border/60 shadow-xl rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="bg-[var(--terra-navy)] text-white p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-white/10 rounded-2xl">
+                  <Bot className="w-6 h-6 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold font-['Syne'] text-white">TerraTrace Land Advisor AI Settings</CardTitle>
+                  <CardDescription className="text-white/60">Configure, train, and test the conversational AI assistant.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Left column: Core API settings */}
+                <div className="space-y-5">
+                  <h4 className="text-sm font-bold text-[var(--terra-navy)] uppercase tracking-wider">API Configuration</h4>
+                  
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200/60">
+                    <div>
+                      <Label htmlFor="chatbot-enabled" className="text-sm font-semibold text-slate-800">Enable Land Advisor Chatbot</Label>
+                      <p className="text-xs text-slate-400 mt-1">Show or hide the floating AI chatbot overlay globally.</p>
+                    </div>
+                    <Switch 
+                      id="chatbot-enabled" 
+                      checked={chatbotEnabled} 
+                      onCheckedChange={setChatbotEnabled} 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatbot-provider" className="text-xs font-bold text-slate-500 uppercase tracking-widest">API Provider / Key Name</Label>
+                    <select 
+                      id="chatbot-provider"
+                      value={chatbotApiKeyName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setChatbotApiKeyName(val);
+                        // Reset default model when provider changes
+                        setChatbotModel(val.toLowerCase().includes('gemini') ? 'gemini-flash-latest' : 'gpt-4o-mini');
+                      }}
+                      className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--terra-navy)] text-sm text-slate-800"
+                    >
+                      <option value="Gemini">Google Gemini (Gemini 2.5 Flash)</option>
+                      <option value="OpenAI">OpenAI (GPT-4o Mini)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatbot-model" className="text-xs font-bold text-slate-500 uppercase tracking-widest">AI Model Selection</Label>
+                    <select 
+                      id="chatbot-model"
+                      value={chatbotModel}
+                      onChange={(e) => setChatbotModel(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--terra-navy)] text-sm text-slate-800"
+                    >
+                      {chatbotApiKeyName.toLowerCase().includes('gemini') ? (
+                        <>
+                          <option value="gemini-flash-latest">Gemini Flash Latest ✅ Recommended</option>
+                          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                          <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                          <option value="gemini-pro-latest">Gemini Pro Latest</option>
+                          <option value="gemini-3.5-flash">Gemini 3.5 Flash (Preview)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="gpt-4o-mini">GPT-4o Mini (Recommended)</option>
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {chatbotApiKeyName.toLowerCase().includes('gemini') && (
+                    <div className="space-y-2">
+                      <Label htmlFor="chatbot-project" className="text-xs font-bold text-slate-500 uppercase tracking-widest">Google Cloud Project ID / Number</Label>
+                      <Input
+                        id="chatbot-project"
+                        type="text"
+                        value={chatbotProjectNumber}
+                        onChange={(e) => setChatbotProjectNumber(e.target.value)}
+                        placeholder="e.g. 977161537894"
+                        className="h-11 rounded-xl text-slate-800"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Required if using Vertex AI/Google Cloud Keys that require resource billing authorization.</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chatbot-key" className="text-xs font-bold text-slate-500 uppercase tracking-widest">API Secret Key</Label>
+                    <div className="relative">
+                      <Input
+                        id="chatbot-key"
+                        type={showChatbotKey ? "text" : "password"}
+                        value={chatbotApiKey}
+                        onChange={(e) => setChatbotApiKey(e.target.value)}
+                        placeholder="Paste your API key here..."
+                        className="pr-10 h-11 rounded-xl text-slate-800"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowChatbotKey(!showChatbotKey)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showChatbotKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button 
+                      onClick={testChatbotConnection}
+                      className="border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 h-10 px-5 rounded-xl font-bold text-xs"
+                    >
+                      Test Connection
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Right column: Training directives */}
+                <div className="space-y-5">
+                  <h4 className="text-sm font-bold text-[var(--terra-navy)] uppercase tracking-wider">AI Training & Knowledge Base</h4>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="system-prompt" className="text-xs font-bold text-slate-500 uppercase tracking-widest">AI Persona / Directives</Label>
+                    <textarea
+                      id="system-prompt"
+                      rows={4}
+                      value={chatbotSystemPrompt}
+                      onChange={(e) => setChatbotSystemPrompt(e.target.value)}
+                      placeholder="Add custom behavioral instructions for the bot here (e.g. Tone directives, greeting overrides)..."
+                      className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--terra-navy)] bg-white text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="knowledge-base" className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fed Knowledge Base</Label>
+                    <textarea
+                      id="knowledge-base"
+                      rows={4}
+                      value={chatbotKnowledgeBase}
+                      onChange={(e) => setChatbotKnowledgeBase(e.target.value)}
+                      placeholder="Feed the AI specific Cameroonian land regulations, FAQs, or custom plot metrics here..."
+                      className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--terra-navy)] bg-white text-slate-800"
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="pt-6 border-t border-border flex justify-end">
+                <Button 
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      const configResponse = await api.patch('/config', {
+                        configs: {
+                          chatbotEnabled: chatbotEnabled,
+                          chatbotApiKey: chatbotApiKey,
+                          chatbotApiKeyName: chatbotApiKeyName,
+                          chatbotModel: chatbotModel,
+                          chatbotProjectNumber: chatbotProjectNumber
+                        }
+                      });
+                      
+                      const trainingResponse = await api.post('/chatbot/train', {
+                        systemPrompt: chatbotSystemPrompt,
+                        knowledgeBase: chatbotKnowledgeBase
+                      });
+
+                      if (configResponse.data.success && trainingResponse.data.success) {
+                        toast.success("Chatbot settings and training successfully updated!");
+                        logActivity('Update', 'Admin updated global AI chatbot parameters and training data');
+                        invalidateQuery('settings_config');
+                      }
+                    } catch (err) {
+                      toast.error("Failed to update chatbot configurations");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-8 rounded-xl h-11 shadow-lg font-bold"
+                >
+                  Save Chatbot & Train AI
                 </Button>
               </div>
             </CardContent>

@@ -1,8 +1,11 @@
+// BEHAVIOR: Displays a list of all land plots owned by the logged-in client or landowner, loading data from useMyLandPlots hook.
 import { useState, useMemo, useEffect } from "react";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
+// BEHAVIOR: Auth hook to check profile data and reload values
 import { useAuth } from "../context/AuthContext";
+// BACKEND_CONNECTION: Custom query hook fetching plots owned by the logged-in user
 import { useMyLandPlots } from "../hooks/useLandData";
 import { logActivity } from "../utils/logger";
 
@@ -14,6 +17,7 @@ export default function MyLandPlotsPage() {
   const { user, refreshUser } = useAuth();
 
   // Refresh user profile if they are a Client to check if they have been upgraded to Landowner
+  // BACKEND_CONNECTION: Automatically invokes user profile refresh on mount to check if LRO approved a plot purchase
   useEffect(() => {
     if (user && user.role === 'Client') {
       refreshUser();
@@ -21,9 +25,11 @@ export default function MyLandPlotsPage() {
   }, []);
 
   // ─── Server state via TanStack Query (cached, deduped) ────────────────────
+  // BACKEND_CONNECTION: Fetches landowner's plots list from server database
   const { data: plots = [], isLoading } = useMyLandPlots();
 
   // Filter based on land code owner segment as requested
+  // BEHAVIOR: Filters loaded plots array matching the owner ID digits encoded within plot land codes
   const myPlots = useMemo(() => {
     if (!user) return [];
     if (user.role === 'Client') return [];
@@ -53,12 +59,14 @@ export default function MyLandPlotsPage() {
   return (
     <div className="space-y-8">
       <div>
+        {/* COLOR_THEME: Header uses Syne Font family */}
         <h1 className="text-3xl font-bold font-['Syne']">My Land Portfolio</h1>
         <p className="text-muted-foreground mt-1 text-lg">
           Manage your registered land assets and track ongoing transfer requests.
         </p>
       </div>
 
+      {/* BEHAVIOR: Renders skeleton loading grid if fetching data from the database */}
       {isLoading && myPlots.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
           {[1, 2, 3].map(i => (
@@ -78,6 +86,7 @@ export default function MyLandPlotsPage() {
         </div>
       ) : (
         <>
+          {/* BEHAVIOR: Grid representing owner's land plots */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myPlots.map((plot) => (
               <LandPlotCard
@@ -89,6 +98,7 @@ export default function MyLandPlotsPage() {
             ))}
           </div>
 
+          {/* BEHAVIOR: Shows empty state view if no plots are matched */}
           {myPlots.length === 0 && (
             <div className="text-center py-20 bg-card border border-border rounded-2xl">
               <p className="text-muted-foreground">You don't have any registered land plots yet.</p>

@@ -258,3 +258,23 @@
     background: rgba(0, 33, 71, 0.2);
   }
 }
+
+/* ── Prose Chatbot Markdown Renderer ────────────────────────── */
+.prose-chatbot { font-size: 0.8125rem; line-height: 1.65; color: rgba(255,255,255,0.88); }
+.prose-chatbot p { margin: 0 0 0.5em; }
+.prose-chatbot p:last-child { margin-bottom: 0; }
+.prose-chatbot strong { color: #fff; font-weight: 700; }
+.prose-chatbot em { font-style: italic; }
+.prose-chatbot a { color: #D4AF37; text-decoration: underline; text-decoration-color: rgba(212,175,55,0.35); cursor: pointer; }
+.prose-chatbot a:hover { text-decoration-color: #D4AF37; }
+.prose-chatbot ul, .prose-chatbot ol { padding-left: 1.25em; margin: 0.35em 0 0.5em; }
+.prose-chatbot li { margin-bottom: 0.25em; }
+.prose-chatbot code { background: rgba(212,175,55,0.1); color: #D4AF37; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.78rem; }
+.prose-chatbot pre { background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 0.75em 1em; margin: 0.5em 0; overflow-x: auto; }
+.prose-chatbot pre code { background: none; padding: 0; color: rgba(255,255,255,0.8); }
+.prose-chatbot blockquote { border-left: 3px solid rgba(212,175,55,0.4); padding-left: 0.75em; color: rgba(255,255,255,0.5); margin: 0.5em 0; }
+.prose-chatbot h1,.prose-chatbot h2,.prose-chatbot h3 { font-weight: 700; color: #fff; margin: 0.6em 0 0.3em; line-height: 1.25; }
+.prose-chatbot h1 { font-size: 1rem; }
+.prose-chatbot h2 { font-size: 0.9rem; }
+.prose-chatbot h3 { font-size: 0.84rem; }
+

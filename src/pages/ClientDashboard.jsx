@@ -1,4 +1,6 @@
+// BEHAVIOR: Renders the Client dashboard, enabling clients to search land plots, check region codes, and view Matterport tours.
 import { useState, useMemo, useEffect } from "react";
+// BEHAVIOR: Context hook for managing authentication state and triggers
 import { useAuth } from "../context/AuthContext";
 import { LandPlotCard } from "../app/components/land/LandPlotCard";
 import { LandPlotModal } from "../app/components/land/LandPlotModal";
@@ -6,6 +8,7 @@ import { Button } from "../app/components/ui/button";
 import { Input } from "../app/components/ui/input";
 import { Badge } from "../app/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../app/components/ui/card";
+// BEHAVIOR: Lucide React icons matching dashboard states
 import { 
   Search, 
   Map as MapIcon, 
@@ -20,14 +23,19 @@ import {
   ShieldCheck,
   CheckCircle2,
   Timer,
-  ChevronRight
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  Eye
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { LandCodeInfo } from "../app/components/shared/LandcodeInfo";
 import { TransferRequestModal } from "../app/components/land/TransferRequestModal";
 import { cn } from "../app/components/ui/utils";
 import { useQueryClient } from "@tanstack/react-query";
+// BACKEND_CONNECTION: Custom hook querying the database for registered land plots
 import { useLandPlots } from "../hooks/useLandData";
+// BACKEND_CONNECTION: Custom hook querying user's transfer requests
 import { useMyTransfers } from "../hooks/useTransferData";
 import {
   Dialog,
@@ -36,7 +44,9 @@ import {
   DialogTitle,
 } from "../app/components/ui/dialog";
 import { logActivity } from "../utils/logger";
+import { getValidMatterportId } from "../utils/matterport";
 
+// BEHAVIOR: Map of region codes to names and capitals
 const REGION_CODES = [
   { code: "01", name: "Adamaoua", capital: "Ngaoundéré" },
   { code: "02", name: "Centre", capital: "Yaoundé" },
@@ -55,6 +65,7 @@ export default function ClientDashboard() {
   const queryClient = useQueryClient();
 
   // Refresh user profile if they are a Client to check if they have been upgraded to Landowner
+  // BACKEND_CONNECTION: Automatically refresh user details on mount
   useEffect(() => {
     if (user && user.role === 'Client') {
       refreshUser();
@@ -62,7 +73,9 @@ export default function ClientDashboard() {
   }, []);
 
   // ─── Server state via TanStack Query (cached, deduped, stale-while-revalidate) ───
+  // BACKEND_CONNECTION: Queries all land plots from server database
   const { data: plots = [], isFetching: plotsFetching, isLoading: plotsLoading } = useLandPlots();
+  // BACKEND_CONNECTION: Queries user transfers list from server database
   const { data: transfers = [] } = useMyTransfers();
   const loading = plotsFetching;
   const showSkeletons = plotsLoading || (plotsFetching && plots.length === 0);
@@ -79,6 +92,13 @@ export default function ClientDashboard() {
   const [is360Open, setIs360Open] = useState(false);
   const [matterportPlot, setMatterportPlot] = useState(null);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!is360Open) {
+      setIsMaximized(false);
+    }
+  }, [is360Open]);
 
   const handleSeeMore = (plot) => {
     setSelectedPlot(plot);
@@ -94,6 +114,7 @@ export default function ClientDashboard() {
 
   const LOCATIONS = [...new Set(plots.map((p) => p.location?.split(",")[1]?.trim() || p.location?.trim()).filter(Boolean))];
 
+  // BEHAVIOR: Filters loaded plots list based on search filters (cni, name, status, land code segments)
   const filteredPlots = plots.filter((plot) => {
     const q = searchQuery.toLowerCase();
     
@@ -180,15 +201,16 @@ export default function ClientDashboard() {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Hero Header */}
       <section className="relative h-[240px] rounded-3xl overflow-hidden shadow-xl">
         <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200" alt="Land" className="w-full h-full object-cover" />
+        {/* COLOR_THEME: Uses gradient overlay of Terra Navy values */}
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--terra-navy)]/90 via-[var(--terra-navy)]/60 to-transparent flex flex-col justify-center px-12 text-white">
+          {/* COLOR_THEME: Large Title uses Syne Font family */}
           <h1 className="text-4xl font-bold font-['Syne'] max-w-xl leading-tight">Secure Land Registry <br /><span className="text-[var(--terra-emerald)]">Cameroon Portal</span></h1>
           <p className="text-base text-white/80 mt-2 max-w-md">Verify, track, and transfer land property with blockchain-backed security.</p>
         </div>
       </section>
-
-
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <div className="lg:col-span-3 space-y-6">
@@ -245,6 +267,7 @@ export default function ClientDashboard() {
             )}
           </AnimatePresence>
 
+          {/* Skeletons rendering during backend fetching operations */}
           {showSkeletons ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
               {[1, 2, 3, 4].map(i => (
@@ -275,6 +298,7 @@ export default function ClientDashboard() {
                   <div key={plot._id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-all cursor-pointer" onClick={() => handleSeeMore(plot)}>
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden shrink-0">
+                        {/* BACKEND_CONNECTION: Displays cover image served by backend assets or CDN URL */}
                         <img src={plot.coverImage ? `http://localhost:5001${plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover" />
                       </div>
                       <div>
@@ -282,6 +306,7 @@ export default function ClientDashboard() {
                         <p className="text-[10px] text-muted-foreground">{plot.location}</p>
                       </div>
                     </div>
+                    {/* COLOR_THEME: Details button styled in Terra Emerald text */}
                     <Button variant="ghost" size="sm" className="h-8 text-xs font-bold gap-1 text-[var(--terra-emerald)]">Details <ChevronRight className="w-3 h-3" /></Button>
                   </div>
                 ))}
@@ -292,6 +317,7 @@ export default function ClientDashboard() {
 
         <div className="space-y-6">
           <LandCodeInfo />
+          {/* COLOR_THEME: Region widgets styled in soft purple border and background tints */}
           <Card className="border-purple-200 bg-purple-50/40 rounded-2xl overflow-hidden dark:border-purple-900/40 dark:bg-purple-950/20">
             <CardHeader className="pb-3">
                <CardTitle className="text-base flex items-center gap-2">
@@ -306,6 +332,7 @@ export default function ClientDashboard() {
                           <span className="text-sm font-semibold">{r.name}</span>
                           <span className="text-[10px] text-muted-foreground">{r.capital}</span>
                        </div>
+                       {/* COLOR_THEME: Region badges styled in purple colors */}
                        <Badge className="bg-purple-100 text-purple-700 h-6 dark:bg-purple-900/30 dark:text-purple-400">{r.code}</Badge>
                     </div>
                   ))}
@@ -331,9 +358,39 @@ export default function ClientDashboard() {
       />
       
       <Dialog open={is360Open} onOpenChange={setIs360Open}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl">
-          <div className="aspect-video w-full">
-            {matterportPlot?.matterportId && <iframe src={`https://my.matterport.com/show/?m=${matterportPlot.matterportId}`} className="w-full h-full border-0" allow="xr-spatial-tracking" />}
+        <DialogContent 
+          className={cn(
+            "p-0 overflow-hidden transition-all duration-300 ease-in-out flex flex-col",
+            isMaximized 
+              ? "max-w-none w-[96vw] h-[92vh] rounded-2xl" 
+              : "max-w-4xl w-full rounded-2xl"
+          )}
+        >
+          <DialogHeader className="px-6 pt-5 pb-3 border-b flex flex-row items-center justify-between">
+            {/* COLOR_THEME: Dialog Title uses Syne Font family */}
+            <DialogTitle className="flex items-center gap-2 font-['Syne']">
+              {/* COLOR_THEME: Icon colored in Terra Emerald green */}
+              <Eye className="w-5 h-5 text-[var(--terra-emerald)]" />
+              360° Virtual Tour — {matterportPlot?.landCode}
+            </DialogTitle>
+            <Button
+              onClick={() => setIsMaximized(!isMaximized)}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground mr-6 shrink-0"
+              title={isMaximized ? "Restore view" : "Maximize view"}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          </DialogHeader>
+          <div className={cn("w-full", isMaximized ? "flex-1 h-full" : "aspect-video")}>
+            {/* BACKEND_CONNECTION: Pulls external Matterport 360 tour for spatial maps review */}
+            <iframe 
+              src={`https://my.matterport.com/show/?m=${getValidMatterportId(matterportPlot?.matterportId, matterportPlot?.landCode)}`} 
+              className="w-full h-full border-0" 
+              allow="xr-spatial-tracking" 
+              title="Matterport 360 Tour"
+            />
           </div>
         </DialogContent>
       </Dialog>

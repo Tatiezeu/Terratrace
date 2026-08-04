@@ -1,7 +1,9 @@
+// BEHAVIOR: Renders the payment gateway interface. Connects with CamPay API for USSD MTN MoMo/Orange Money pushes, supports transaction status polling, and outputs downloadable PDF receipts.
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 import jsPDF from "jspdf";
+// BEHAVIOR: UI Icons representing security badges, phones, checkmarks, clocks, downloads, and loaders
 import {
   Shield,
   ChevronLeft,
@@ -26,14 +28,19 @@ import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import { toast } from "sonner";
 
-// ─── Tokens ─────────────────────────────────────────────────────────────────
+// ─── COLOR_THEME Tokens ───────────────────────────────────────────────────────
+// COLOR_THEME: Navy Blue base color for high trust brand identity
 const NAVY = "#002147";
+// COLOR_THEME: Gold accent color representing premium security and land value
 const GOLD = "#D4AF37";
+// COLOR_THEME: Light gold highlighting for subtle gradient stops
 const GOLD_LIGHT = "#F0D675";
+// COLOR_THEME: Muted gold tone for borders and subheadings
 const GOLD_MUTED = "#B8943A";
 const WHITE = "#ffffff";
 const SURFACE = "#f4f6f9";
 const MUTED = "#64748b";
+// COLOR_THEME: Success indicator color
 const SUCCESS_GREEN = "#16a34a";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -59,6 +66,7 @@ function Tip({ text }) {
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
+        // COLOR_THEME: Gold tooltip trigger icon color
         style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: GOLD, display: "flex" }}
       >
         <HelpCircle size={13} />
@@ -70,6 +78,7 @@ function Tip({ text }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ duration: 0.15 }}
+            // COLOR_THEME: Tooltip styled in NAVY background and WHITE text
             style={{
               position: "absolute",
               bottom: "calc(100% + 8px)",
@@ -112,6 +121,7 @@ function Tip({ text }) {
 function MtnLogo({ size = 56 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      {/* COLOR_THEME: MTN yellow brand background */}
       <rect width="56" height="56" rx="10" fill="#FFCB00" />
       <text x="28" y="24" textAnchor="middle" fill="#000000"
         fontFamily="Arial Black, Arial, sans-serif" fontWeight="900" fontSize="14">
@@ -130,6 +140,7 @@ function MtnLogo({ size = 56 }) {
 function OrangeLogo({ size = 56 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      {/* COLOR_THEME: Orange money brand background */}
       <rect width="56" height="56" rx="10" fill="#FF6600" />
       <circle cx="28" cy="22" r="9" fill="none" stroke="white" strokeWidth="3" />
       <text x="28" y="26" textAnchor="middle" fill="white"
@@ -156,6 +167,7 @@ function TrustStrip() {
     <div className="flex items-center justify-center gap-6 flex-wrap" style={{ padding: "12px 0" }}>
       {items.map(({ icon, text }) => (
         <div key={text} className="flex items-center gap-1.5">
+          {/* COLOR_THEME: Security details icons highlighted in Gold */}
           <span style={{ color: GOLD }}>{icon}</span>
           <span style={{ fontFamily: "Montserrat, sans-serif", fontSize: "11px", color: MUTED, fontWeight: 500 }}>{text}</span>
         </div>
@@ -201,6 +213,7 @@ function SidebarTips() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4 }}
         >
+          {/* COLOR_THEME: Tips icons in GOLD */}
           <div style={{ flexShrink: 0, color: GOLD, marginTop: 1 }}>{icon}</div>
           <div>
             <p style={{ fontFamily: "Montserrat, sans-serif", fontSize: "12px", fontWeight: 700, color: WHITE }}>{title}</p>
@@ -213,16 +226,17 @@ function SidebarTips() {
 }
 
 // ─── PDF receipt ──────────────────────────────────────────────────────────────
+// BEHAVIOR: Generates and triggers download of a custom PDF receipt using jsPDF A4 template
 function downloadReceipt(params) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const pad = 20;
 
-  // Background header band
+  // COLOR_THEME: Top header band in PDF colored in navy RGB (0, 33, 71)
   doc.setFillColor(0, 33, 71);
   doc.rect(0, 0, W, 52, "F");
 
-  // Gold accent line
+  // COLOR_THEME: Gold accent divider line in PDF RGB (212, 175, 55)
   doc.setFillColor(212, 175, 55);
   doc.rect(0, 52, W, 2, "F");
 
@@ -248,7 +262,7 @@ function downloadReceipt(params) {
   doc.setFontSize(9);
   doc.text("Official Document", W - pad, 33, { align: "right" });
 
-  // Status badge
+  // COLOR_THEME: Status badge filled with green RGB (22, 163, 74)
   doc.setFillColor(22, 163, 74);
   doc.roundedRect(pad, 40, 40, 8, 2, 2, "F");
   doc.setTextColor(255, 255, 255);
@@ -336,6 +350,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
   const { user: rawUser } = useAuth();
   
   const [time, setTime] = useState(new Date());
+  // BEHAVIOR: Screens can toggle between 'landing', 'payment', 'processing', 'success'
   const [screen, setScreen] = useState(isModal ? "payment" : "landing");
   const [appDetails, setAppDetails] = useState(null);
   const [fetching, setFetching] = useState(true);
@@ -346,6 +361,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
   const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [paymentData, setPaymentData] = useState(null);
+  // BEHAVIOR: 60-second cooldown timer controlling the USSD resend ability
   const [resendCountdown, setResendCountdown] = useState(0);
   const [resending, setResending] = useState(false);
 
@@ -380,6 +396,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
   useEffect(() => {
     const fetchTransferDetails = async () => {
       try {
+        // BACKEND_CONNECTION: GET /transfer/:id loads the land dossier and its associated notice fee details
         const res = await api.get(`/transfer/${id}`);
         if (res.data.success) {
           setAppDetails(res.data.data);
@@ -408,6 +425,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
     if (screen !== "processing") return;
     const interval = setInterval(async () => {
       try {
+        // BACKEND_CONNECTION: GET /transfer/:id/check-payment polls transaction verification state on the backend
         const response = await api.get(`/transfer/${id}/check-payment`);
         if (response.data.success && response.data.data.status === 'Payment_Verified') {
           clearInterval(interval);
@@ -417,7 +435,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
       } catch (err) {
         console.warn("Polling payment check failed:", err);
       }
-    }, 4000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [screen, id]);
@@ -458,6 +476,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
     setPaying(true);
 
     try {
+      // BACKEND_CONNECTION: POST /transfer/:id/pay-fee initiates CamPay payment collection request
       const res = await api.post(`/transfer/${id}/pay-fee`, {
         phone: digits,
         operator: selected
@@ -473,6 +492,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
           timestamp: nowStr()
         });
         setScreen("processing");
+        // BEHAVIOR: Starts 60-second cooldown timer to prevent spamming USSD calls too quickly
         setResendCountdown(60);
         toast.info("USSD Push sent to your mobile phone!");
       }
@@ -491,6 +511,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
     setError("");
     try {
       const digits = phone.replace(/\D/g, "");
+      // BACKEND_CONNECTION: POST /transfer/:id/pay-fee re-triggers CamPay collection request
       const res = await api.post(`/transfer/${id}/pay-fee`, {
         phone: digits,
         operator: selected
@@ -516,6 +537,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
   const handleVerifyPaidStatus = async () => {
     setVerifying(true);
     try {
+      // BACKEND_CONNECTION: GET /transfer/:id/check-payment explicitly requests verification of payment status
       const response = await api.get(`/transfer/${id}/check-payment`);
       if (response.data.success && response.data.data.status === 'Payment_Verified') {
         toast.success("Payment verified successfully!");
@@ -537,6 +559,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
 
   // ─── NAV BAR COMPONENT (styled with user's color theme & matching dashboard look) ───
   const RenderNavbar = () => (
+    // COLOR_THEME: Navbar has Navy gradient header with gold bottom border
     <div style={{ 
       background: `linear-gradient(135deg, ${NAVY} 0%, #001f42 100%)`, 
       padding: "12px 40px", 
@@ -599,6 +622,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
       {/* User profile styled like dashboard TopNav */}
       {user && (
         <div className="flex items-center gap-3 pl-6 border-l border-white/20">
+          {/* COLOR_THEME: Gold ring around user avatar */}
           <Avatar className="w-10 h-10 ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-background">
             <AvatarImage src={user.avatar} />
             <AvatarFallback className="bg-[#D4AF37] text-[#002147] font-semibold">
@@ -622,12 +646,14 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
     <AnimatePresence mode="wait">
       {screen === "landing" && (
         <motion.div key="landing" style={{ position: "fixed", inset: 0 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.4 }}>
+          {/* COLOR_THEME: Landing page dark gradient background */}
           <div className="flex flex-col items-center justify-center min-h-screen" style={{ background: `linear-gradient(145deg, ${NAVY} 0%, #001530 55%, #001030 100%)` }}>
             <motion.div className="flex flex-col items-center" style={{ maxWidth: 560, padding: "0 32px", textAlign: "center" }} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1 }}>
               <Logo variant="dark" className="h-16 w-auto mb-10" />
 
               <h1 style={{ fontFamily: "Cormorant Garamond, serif", fontSize: "clamp(30px,4vw,48px)", fontWeight: 600, color: WHITE, lineHeight: 1.15, letterSpacing: "0.01em", marginBottom: 20 }}>
                 Secure Land Registry<br />
+                {/* COLOR_THEME: Header highlighted with Gold */}
                 <span style={{ color: GOLD }}>Escrow Fee Portal</span>
               </h1>
               <p style={{ fontFamily: "Montserrat, sans-serif", fontSize: "14px", fontWeight: 400, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 440, marginBottom: 40 }}>
@@ -636,12 +662,14 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
 
               <div className="flex flex-wrap justify-center gap-3 mb-10">
                 {["Orange Money", "MTN MoMo", "Instant Receipt", "Campay Secured"].map((f) => (
+                  // COLOR_THEME: Features tags highlighted with translucent Gold background
                   <div key={f} style={{ background: "rgba(212,175,55,0.12)", border: `1px solid rgba(212,175,55,0.3)`, borderRadius: 24, padding: "6px 16px" }}>
                     <span style={{ fontFamily: "Montserrat, sans-serif", fontSize: "11px", fontWeight: 600, color: GOLD }}>{f}</span>
                   </div>
                 ))}
               </div>
 
+              {/* COLOR_THEME: Primary CTA button features Gold color gradient */}
               <motion.button
                 onClick={() => setScreen("payment")}
                 style={{
@@ -679,6 +707,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
             {/* Left Column: Tips */}
             {!isModal && (
               <div className="lg:col-span-1">
+                {/* COLOR_THEME: Tips panel has custom Navy background */}
                 <div className="sticky top-6 rounded-3xl p-6 shadow-sm" style={{ background: `linear-gradient(160deg, ${NAVY} 0%, #00254d 100%)`, color: WHITE }}>
                   <SidebarTips />
                 </div>
@@ -732,6 +761,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                           key={id}
                           type="button"
                           onClick={() => { setSelected(id); setError(""); }}
+                          // COLOR_THEME: Conditional borders and shadows showing selected operator in Gold
                           style={{
                             background: selected === id ? "rgba(212,175,55,0.06)" : WHITE,
                             border: selected === id ? `2px solid ${GOLD}` : `2px solid rgba(0,33,71,0.1)`,
@@ -758,6 +788,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                       Handset Number
                     </label>
                     <div style={{ display: "flex", border: `2px solid rgba(0,33,71,0.1)`, borderRadius: 12, overflow: "hidden" }}>
+                      {/* COLOR_THEME: Operator indicator has dark Navy background */}
                       <div style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #003470 100%)`, padding: "0 16px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                         <Phone size={13} color={GOLD} />
                         <span style={{ fontFamily: "Montserrat, sans-serif", fontWeight: 700, fontSize: "14px", color: WHITE }}>+237</span>
@@ -788,6 +819,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                   </AnimatePresence>
 
                   {/* Submit Button */}
+                  {/* COLOR_THEME: Submit button uses gold gradient theme */}
                   <motion.button
                     type="button"
                     disabled={paying}
@@ -827,6 +859,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
               <div style={{ maxWidth: 560, width: "100%" }} className={isModal ? "mx-auto" : "mx-auto mt-12"}>
                 
                 {/* Status Badge */}
+                {/* COLOR_THEME: Yellow warning badge for pending USSD approval */}
                 <motion.div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-full px-5 py-1.5 mb-8" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                   <motion.div style={{ width: 8, height: 8, borderRadius: "50%", background: GOLD }} animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1.2, repeat: Infinity }} />
                   <span style={{ fontFamily: "Montserrat, sans-serif", fontSize: "11px", fontWeight: 700, color: GOLD, letterSpacing: "0.1em" }}>AWAITING HANDSET AUTHORIZATION</span>
@@ -838,6 +871,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                     {[0, 1, 2].map((i) => (
                       <motion.div key={i} style={{ position: "absolute", inset: 0, border: `2px solid ${GOLD}`, borderRadius: "50%" }} initial={{ opacity: 0.7, scale: 0.7 }} animate={{ opacity: 0, scale: 1.5 }} transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.5, ease: "easeOut" }} />
                     ))}
+                    {/* COLOR_THEME: Central circular logo box uses dark Navy and Gold border */}
                     <motion.div style={{ position: "absolute", inset: "14px", background: `linear-gradient(135deg, ${NAVY} 0%, #003470 100%)`, border: `3px solid ${GOLD}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }} animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.4, repeat: Infinity }}>
                       <Phone size={24} color={GOLD} />
                     </motion.div>
@@ -852,6 +886,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                 </p>
 
                 {/* Amount Recap */}
+                {/* COLOR_THEME: Border colored with gold accent */}
                 <div style={{ display: "inline-flex", gap: 32, background: "rgba(255,255,255,0.04)", border: `1px solid rgba(212,175,55,0.18)`, borderRadius: 16, padding: "16px 36px" }} className="mb-8 items-center">
                   <div className="text-left">
                     <p style={{ fontFamily: "Montserrat, sans-serif", fontSize: "9px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Total Charged</p>
@@ -868,6 +903,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
 
                 {/* Action Buttons */}
                 <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                  {/* COLOR_THEME: Verification action uses gold theme gradient */}
                   <motion.button
                     onClick={handleVerifyPaidStatus}
                     disabled={verifying}
@@ -910,6 +946,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                     disabled={resendCountdown > 0 || resending}
                     className="flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
+                      // COLOR_THEME: Button background changes dynamically based on active cooldown state
                       background: resendCountdown > 0 
                         ? "rgba(255,255,255,0.04)"
                         : `linear-gradient(135deg, ${GOLD} 0%, ${GOLD_MUTED} 100%)`,
@@ -948,11 +985,12 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
         <motion.div key="success" style={wrapperStyle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}>
           {!isModal && <RenderNavbar />}
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: isModal ? "12px" : "48px 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyCenter: "center", padding: isModal ? "12px" : "48px 24px" }}>
             <div style={{ maxWidth: 600, width: "100%" }}>
               
               {/* Success Message Header */}
               <motion.div className="text-center mb-8" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+                {/* COLOR_THEME: Success icon wrapper uses soft green gradient background */}
                 <motion.div style={{ display: "inline-flex", alignItems: "center", justifyCenter: "center", width: 90, height: 90, borderRadius: "50%", background: "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)", marginBottom: 20, boxShadow: "0 8px 32px rgba(22,163,74,0.25)" }} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18, delay: 0.1 }} className="flex justify-center items-center">
                   <CheckCircle2 size={48} color={SUCCESS_GREEN} strokeWidth={2} />
                 </motion.div>
@@ -965,6 +1003,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
               </motion.div>
 
               {/* Amount Paid banner */}
+              {/* COLOR_THEME: Success banner uses dark Navy gradient background */}
               <motion.div style={{ background: `linear-gradient(135deg, ${NAVY} 0%, #003470 100%)`, borderRadius: 20, padding: "24px 36px", marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 8px 32px rgba(0,33,71,0.25)" }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                 <div>
                   <p style={{ fontFamily: "Montserrat, sans-serif", fontSize: "9px", color: "rgba(255,255,255,0.45)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Amount In Escrow</p>
@@ -978,6 +1017,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
 
               {/* Transaction details card */}
               <motion.div style={{ background: WHITE, borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,33,71,0.06)", marginBottom: 24 }} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                {/* COLOR_THEME: Top decorative line on success card is gold gradient */}
                 <div style={{ height: 4, background: `linear-gradient(90deg, ${GOLD} 0%, ${GOLD_LIGHT} 100%)` }} />
                 <div style={{ padding: "24px 28px" }}>
                   <p style={{ fontFamily: "Montserrat, sans-serif", fontSize: "10px", fontWeight: 700, color: MUTED, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
@@ -996,6 +1036,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                   ].map(({ label, value, gold, green }, i, arr) => (
                     <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < arr.length - 1 ? "1px solid rgba(0,33,71,0.05)" : "none" }}>
                       <span style={{ fontFamily: "Montserrat, sans-serif", fontSize: "12px", color: MUTED, fontWeight: 500 }}>{label}</span>
+                      {/* COLOR_THEME: Table values use GOLD, SUCCESS_GREEN, or NAVY depending on field status */}
                       <span style={{
                         fontFamily: gold ? "Cormorant Garamond, serif" : "Montserrat, sans-serif",
                         fontSize: gold ? "18px" : "12px",
@@ -1009,6 +1050,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
 
               {/* Action Buttons */}
               <motion.div style={{ display: "flex", gap: 16, flexWrap: "wrap" }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+                {/* COLOR_THEME: Return to dashboard button has Navy background */}
                 <motion.button
                   onClick={() => {
                     if (isModal) {
@@ -1025,7 +1067,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                     fontSize: "13px", letterSpacing: "0.08em",
                     borderRadius: 12, padding: "16px 24px",
                     border: "none", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    display: "flex", alignItems: "center", justifyCenter: "center", gap: 8,
                     boxShadow: "0 6px 24px rgba(0,33,71,0.2)",
                   }}
                   whileHover={{ scale: 1.01 }}
@@ -1034,6 +1076,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                   <LayoutDashboard size={16} /> GO TO DASHBOARD
                 </motion.button>
 
+                {/* COLOR_THEME: Download receipt button styled with gold border highlighting on hover */}
                 <motion.button
                   onClick={() => downloadReceipt(paymentData)}
                   style={{
@@ -1043,7 +1086,7 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
                     fontSize: "13px", letterSpacing: "0.06em",
                     borderRadius: 12, padding: "16px 24px",
                     border: `2px solid rgba(0,33,71,0.15)`, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    display: "flex", alignItems: "center", justifyCenter: "center", gap: 8,
                     boxShadow: "0 2px 10px rgba(0,33,71,0.06)",
                   }}
                   whileHover={{ background: SURFACE, borderColor: GOLD }}

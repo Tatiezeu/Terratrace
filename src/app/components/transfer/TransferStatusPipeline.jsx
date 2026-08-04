@@ -1,7 +1,9 @@
+// BEHAVIOR: Renders a horizontal progress pipeline tracking status states (initiated, verified, site visit, notice, completed) or a red banner if disputed.
 import { Check, Clock, AlertTriangle } from "lucide-react";
 import { cn } from "../ui/utils";
 
 export function TransferStatusPipeline({ status }) {
+  // BEHAVIOR: Defines steps for the land transfer pipeline
   const steps = [
     { key: "initiated", label: "Initiated" },
     { key: "notary_verified", label: "Notary Verified" },
@@ -10,11 +12,14 @@ export function TransferStatusPipeline({ status }) {
     { key: "completed", label: "Titre Foncier Issued" },
   ];
 
+  // BEHAVIOR: Determines ordering index to color lines and dots accordingly
   const statusOrder = ["initiated", "notary_verified", "site_visit", "published", "completed"];
   const currentIndex = statusOrder.indexOf(status);
 
+  // BEHAVIOR: Intercepts workflow status: shows a red warning banner if a lawsuit/dispute exists
   if (status === "disputed") {
     return (
+      // COLOR_THEME: Danger/dispute red border and background style
       <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-4">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
@@ -46,6 +51,7 @@ export function TransferStatusPipeline({ status }) {
           return (
             <div key={step.key} className="flex items-center flex-1">
               <div className="flex flex-col items-center flex-1">
+                {/* COLOR_THEME: Updates node background based on state: Completed uses Terra Emerald, Current uses Blue, Pending uses Gray */}
                 <div
                   className={cn(
                     "w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all",
@@ -74,8 +80,10 @@ export function TransferStatusPipeline({ status }) {
                   {step.label}
                 </p>
               </div>
+              {/* BEHAVIOR: Renders joining pipeline lines */}
               {index < steps.length - 1 && (
                 <div
+                  // COLOR_THEME: Completed segments are styled in Terra Emerald green, incomplete segments in gray
                   className={cn(
                     "h-0.5 flex-1 mx-2 transition-colors",
                     isCompleted ? "bg-[var(--terra-emerald)]" : "bg-muted"

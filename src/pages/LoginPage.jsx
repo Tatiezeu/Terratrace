@@ -150,26 +150,32 @@ export default function LoginPage() {
             setCachedData('land', data);
             return data;
           }
-        }),
-        queryClient.prefetchQuery({
-          queryKey: ['users', 'all'],
-          queryFn: async () => {
-            const res = await api.get('/users');
-            const data = res.data.data;
-            setCachedData('users_all', data);
-            return data;
-          }
-        }),
-        queryClient.prefetchQuery({
-          queryKey: ['settings_config'],
-          queryFn: async () => {
-            const res = await api.get('/config');
-            const data = res.data.data;
-            setCachedData('settings_config', data);
-            return data;
-          }
         })
       ];
+
+      // BACKEND_CONNECTION: Prefetch admin-only configurations and user listings if user has Admin role
+      if (userData.role === 'Admin') {
+        prefetchPromises.push(
+          queryClient.prefetchQuery({
+            queryKey: ['users', 'all'],
+            queryFn: async () => {
+              const res = await api.get('/users');
+              const data = res.data.data;
+              setCachedData('users_all', data);
+              return data;
+            }
+          }),
+          queryClient.prefetchQuery({
+            queryKey: ['settings_config'],
+            queryFn: async () => {
+              const res = await api.get('/config');
+              const data = res.data.data;
+              setCachedData('settings_config', data);
+              return data;
+            }
+          })
+        );
+      }
 
       // Execute queries in background concurrently (fire-and-forget, do not block transition)
       prefetchPromises.forEach(p => p.catch(() => null));

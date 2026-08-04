@@ -1,3 +1,4 @@
+// BEHAVIOR: Modal dialog allowing Land Registry Officers (LROs) to register new plots, allocating them to either new or existing landowners.
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
+// BACKEND_CONNECTION: Axios API helper for REST requests
 import api from "../../../utils/api";
 import { mockOfficers } from "../../../data/mockData";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,6 +53,7 @@ export function RegisterLandownerModal({ open, onClose }) {
   const [useExistingOwner, setUseExistingOwner] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState("");
 
+  // BACKEND_CONNECTION: GET /users/recipients - Retrieves potential landowners and notaries list from the database
   useEffect(() => {
     if (open) {
       api.get('/users/recipients')
@@ -64,6 +67,7 @@ export function RegisterLandownerModal({ open, onClose }) {
     }
   }, [open]);
 
+  // BEHAVIOR: Map of Cameroon's regions with their official numeric codes
   const regions = [
     { name: "Adamaoua", code: "01" },
     { name: "Centre", code: "02" },
@@ -77,6 +81,7 @@ export function RegisterLandownerModal({ open, onClose }) {
     { name: "South West", code: "10" },
   ];
 
+  // BEHAVIOR: Generates a unique land code format: [type]-[region]-[owner_cni_hash]-[plot_no]
   const generateLandCode = () => {
     const typeCode = formData.landType === "private" ? "10005" : "00050";
     const regionObj = regions.find(r => r.name === formData.region);
@@ -121,6 +126,7 @@ export function RegisterLandownerModal({ open, onClose }) {
     return null;
   };
 
+  // BACKEND_CONNECTION: POST /land/register-all - Submits plot data, landowner credentials, and image attachments as multipart form-data
   const handleSubmit = async () => {
     const errorMsg = validateForm();
     if (errorMsg) {
@@ -161,6 +167,7 @@ export function RegisterLandownerModal({ open, onClose }) {
             formDataToSend.append('coverImage', coverImage);
         }
 
+        // BACKEND_CONNECTION: Executes multipart REST request
         const response = await api.post('/land/register-all', formDataToSend, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
@@ -202,6 +209,7 @@ export function RegisterLandownerModal({ open, onClose }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          {/* COLOR_THEME: Header uses Syne Font family */}
           <DialogTitle className="text-2xl font-bold font-['Syne']">
             Register New Landowner & Plot
           </DialogTitle>
@@ -389,6 +397,7 @@ export function RegisterLandownerModal({ open, onClose }) {
                   </div>
                   
                   {selectedOwnerId && (
+                    // COLOR_THEME: Selection success banner styled in soft green color scheme
                     <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -471,9 +480,10 @@ export function RegisterLandownerModal({ open, onClose }) {
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
+          {/* COLOR_THEME: Action trigger button styled in Terra Emerald green */}
           <Button
             onClick={handleSubmit}
-            className="bg-[var(--terra-emerald)] hover:bg-emerald-600"
+            className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white"
           >
             Validate & Register
           </Button>

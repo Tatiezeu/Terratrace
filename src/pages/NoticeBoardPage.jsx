@@ -1,4 +1,6 @@
+// BEHAVIOR: Displays public notices for active transfer requests, letting landowners and citizens view notice expiry count-downs and file official objections.
 import { useState, useMemo, useEffect } from "react";
+// BEHAVIOR: UI Icons representing locations, calendars, warning, megaphone, objections, and deletion
 import {
   MapPin, Calendar, Clock, Search, Filter, AlertCircle,
   ShieldCheck, Megaphone, ArrowRight, X, ChevronDown, Send, Eye, Timer, Trash2
@@ -19,7 +21,9 @@ import api from "../utils/api";
 import { cn } from "../app/components/ui/utils";
 import { useAuth } from "../context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+// BACKEND_CONNECTION: usePublicNotices fetches transfers awaiting LRO notice period.
 import { usePublicNotices } from "../hooks/useTransferData";
+// BACKEND_CONNECTION: useConfig queries database configuration values like countdown limits.
 import { useConfig } from "../hooks/useConfig";
 
 export default function NoticeBoardPage() {
@@ -27,11 +31,14 @@ export default function NoticeBoardPage() {
   const queryClient = useQueryClient();
 
   // ─── Server state via TanStack Query (cached, stale-while-revalidate) ───────
+  // BACKEND_CONNECTION: Queries all public notices via usePublicNotices hook
   const { data: notices = [], isLoading: noticesLoading } = usePublicNotices();
+  // BACKEND_CONNECTION: Queries global system configurations via useConfig hook
   const { data: config = {} } = useConfig();
+  // BEHAVIOR: Local state tracking array of cleared notice IDs to hide them in the current view
   const [clearedNoticeIds, setClearedNoticeIds] = useState([]);
 
-  // Load cleared notice IDs from localStorage
+  // BEHAVIOR: Load cleared notice IDs from localStorage on mount/user-change
   useEffect(() => {
     if (user) {
       const saved = localStorage.getItem(`cleared_public_notices_${user._id || user.id}`);
@@ -49,12 +56,13 @@ export default function NoticeBoardPage() {
   const [countdownOpen, setCountdownOpen] = useState(false);
   const [clearNoticesConfirmOpen, setClearNoticesConfirmOpen] = useState(false);
 
+  // BEHAVIOR: Sets the visibility of the "Clear All Notices" confirmation popup
   const handleClearAllNotices = () => {
     setClearNoticesConfirmOpen(true);
   };
 
+  // BEHAVIOR: Performs frontend-only notice exclusion, writing cleared notice IDs to localStorage
   const executeClearAllNotices = () => {
-    // Frontend-only clear: store cleared notice IDs in localStorage
     const idsToClear = notices.map(n => n._id);
     const updated = [...new Set([...clearedNoticeIds, ...idsToClear])];
     setClearedNoticeIds(updated);
@@ -65,6 +73,7 @@ export default function NoticeBoardPage() {
     setClearNoticesConfirmOpen(false);
   };
 
+  // BEHAVIOR: Filters notices dynamically by query, region, and cleared status
   const filteredNotices = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return notices
@@ -78,17 +87,21 @@ export default function NoticeBoardPage() {
       });
   }, [searchQuery, regionFilter, notices, clearedNoticeIds]);
 
+  // BEHAVIOR: Sets up default legal contestation template targeting specific LRO & Land Plot
   const openObjection = (notice) => {
     setSelectedNotice(notice);
     setObjectionMsg(`Dear LRO ${notice.lro?.firstName} ${notice.lro?.lastName},\n\nI write to formally contest the land transfer notice (Plot: ${notice.plot.landCode}) published on the TerraTrace platform.\n\nMy objection is based on the following grounds:\n[Please describe your objection here]\n\nI request that this matter be reviewed before any transfer is finalized.`);
     setObjectionOpen(true);
   };
 
+  // BEHAVIOR: Submits user's official objection text to the backend
   const handleSendObjection = async () => {
     try {
+      // BACKEND_CONNECTION: POST /transfer/:id/objection submit objection reason payload
       await api.post(`/transfer/${selectedNotice._id}/objection`, { reason: objectionMsg });
       toast.success("Objection submitted successfully!");
       setObjectionOpen(false);
+      // Invalidate queries to refresh listing in real-time
       queryClient.invalidateQueries({ queryKey: ['transfers', 'public-notices'] });
       queryClient.invalidateQueries({ queryKey: ['transfers'] });
     } catch (err) {
@@ -96,6 +109,7 @@ export default function NoticeBoardPage() {
     }
   };
 
+  // BEHAVIOR: Simple utility calculating days left from dates difference
   const getDaysLeft = (endDate) => {
     const diff = new Date(endDate) - new Date();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
@@ -115,6 +129,7 @@ export default function NoticeBoardPage() {
       <div className="border-b border-border pb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
+            {/* COLOR_THEME: Primary Navy text color '#002147' with Emerald logo highlights */}
             <h1 className="text-3xl font-bold font-['Syne'] text-[#002147] dark:text-white flex items-center gap-3">
               <Megaphone className="w-8 h-8 text-[var(--terra-emerald)]" />
               Public Notice Board
@@ -124,6 +139,7 @@ export default function NoticeBoardPage() {
             </p>
           </div>
           {user?.role === 'Admin' && (
+            // COLOR_THEME: Delete button utilizes classic red color classes
             <Button
               onClick={handleClearAllNotices}
               className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl h-11 px-6 shadow-lg shadow-red-500/10 gap-2 shrink-0 md:self-end"
@@ -133,11 +149,12 @@ export default function NoticeBoardPage() {
           )}
         </div>
         <div className="flex gap-4 mt-4">
+          {/* COLOR_THEME: Stats badge highlights using emerald indicator dots */}
           <div className="flex items-center gap-2 text-sm"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span><strong>{notices.length}</strong> Active Notices</span></div>
         </div>
       </div>
 
-      {/* Search + Filters omitted for brevity, keeping existing structure */}
+      {/* Search + Filters */}
       <div className="space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
@@ -192,9 +209,11 @@ export default function NoticeBoardPage() {
               >
               <Card className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all group h-full flex flex-col">
                 <div className="relative h-48">
+                  {/* BACKEND_CONNECTION: Renders cover image uploaded on backend */}
                   <img src={notice.plot.coverImage ? `http://localhost:5001${notice.plot.coverImage}` : "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800"} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   <div className="absolute top-4 right-4">
+                    {/* COLOR_THEME: Expired and active status badges utilize red and emerald palettes respectively */}
                     <Badge className={cn(
                       "border text-[10px] uppercase font-bold",
                       new Date(notice.publicNotice.endDate) < new Date() 
@@ -206,6 +225,7 @@ export default function NoticeBoardPage() {
                   </div>
                   <div className="absolute bottom-4 left-4 right-4">
                     <div className="flex gap-2 mb-2">
+                      {/* COLOR_THEME: Badges highlighted with emerald and neutral transparencies */}
                       <Badge className="bg-[var(--terra-emerald)] text-white border-0 text-[10px]">{notice.plot.landCode}</Badge>
                       <Badge className="bg-white/20 text-white border-0 text-[10px]">{notice.transferType?.replace('_', ' ') || "TRANSFER"}</Badge>
                     </div>
@@ -217,6 +237,7 @@ export default function NoticeBoardPage() {
                   <div className="space-y-4 flex-1">
                     <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(notice.publicNotice.startDate).toLocaleDateString()}</div>
+                      {/* COLOR_THEME: Notice expiration date highlights with conditional red/emerald classes */}
                       <div className={cn(
                         "flex items-center gap-1 font-medium",
                         new Date(notice.publicNotice.endDate) < new Date() ? "text-red-500" : "text-emerald-600"
@@ -230,6 +251,7 @@ export default function NoticeBoardPage() {
                       "The land in question is about to be transferred from {notice.sender.firstName} {notice.sender.lastName} to {notice.receiver?.firstName} {notice.receiver?.lastName}."
                     </p>
 
+                    {/* COLOR_THEME: Warning warning box uses warm amber borders and text */}
                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2 dark:bg-amber-950/30 dark:border-amber-800">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
@@ -240,6 +262,7 @@ export default function NoticeBoardPage() {
 
                   <div className="pt-5 mt-auto flex items-center justify-between border-t gap-2">
                     <div className="flex items-center gap-2">
+                      {/* COLOR_THEME: Certified indicator dot styled in emerald */}
                       <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       </div>
@@ -254,6 +277,7 @@ export default function NoticeBoardPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
+                      {/* COLOR_THEME: Objection CTA uses danger/red theme styles */}
                       <Button
                         variant="ghost"
                         disabled={new Date(notice.publicNotice.endDate) < new Date() || notice.receiver?._id === user?._id}
@@ -266,9 +290,9 @@ export default function NoticeBoardPage() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
@@ -335,6 +359,7 @@ export default function NoticeBoardPage() {
 
           <CountdownDisplay targetDate={selectedNotice?.publicNotice?.endDate} config={config} />
 
+          {/* COLOR_THEME: Modal primary action button styled in Navy #002147 */}
           <Button onClick={() => setCountdownOpen(false)} className="w-full bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white h-12 rounded-xl text-sm font-bold uppercase tracking-widest">
             Close View
           </Button>
@@ -371,12 +396,14 @@ export default function NoticeBoardPage() {
   );
 }
 
+// BEHAVIOR: Displays real-time countdown progress circle and days/time layout
 function CountdownDisplay({ targetDate, config }) {
   const [timeLeft, setTimeLeft] = useState(null);
 
   useEffect(() => {
     if (!targetDate) return;
 
+    // BEHAVIOR: Periodically calculates remaining interval until notice expiry
     const calculateTime = () => {
       const target = new Date(targetDate).getTime();
       const now = new Date().getTime();
@@ -423,6 +450,7 @@ function CountdownDisplay({ targetDate, config }) {
       <div className="relative w-48 h-48 flex items-center justify-center">
         <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" className="text-muted/10" />
+          {/* COLOR_THEME: SVG stroke color uses red or emerald variable dynamically */}
           <circle 
             cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="4" 
             strokeDasharray="289" 
@@ -435,6 +463,7 @@ function CountdownDisplay({ targetDate, config }) {
           <Timer className={`w-6 h-6 mb-1 ${isExpired ? 'text-red-500' : 'text-[var(--terra-emerald)]'}`} />
           {timeLeft.days > 0 ? (
             <>
+              {/* COLOR_THEME: Countdown text uses dark navy #002147 */}
               <span className="text-4xl font-black text-[#002147] dark:text-white">{timeLeft.days}</span>
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Days Left</span>
             </>
@@ -450,9 +479,11 @@ function CountdownDisplay({ targetDate, config }) {
       <div className="w-full space-y-4">
         <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           <span>Expires: {new Date(targetDate).toLocaleString()}</span>
+          {/* COLOR_THEME: Text status highlights in red or emerald */}
           <span className={isExpired ? 'text-red-500' : 'text-emerald-500'}>{isExpired ? 'EXPIRED' : 'ACTIVE'}</span>
         </div>
         <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+          {/* COLOR_THEME: Flat progress bar filled with red or emerald */}
           <div 
             className={`h-full transition-all duration-1000 ${isExpired ? 'bg-red-500' : 'bg-[var(--terra-emerald)]'}`} 
             style={{ width: `${timeLeft.percentage}%` }} 

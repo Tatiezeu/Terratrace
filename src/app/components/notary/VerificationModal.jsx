@@ -1,3 +1,4 @@
+// BEHAVIOR: Renders a multi-step Notary verification wizard dialog permitting notaries to review buyer files, upload compiled contracts, issue fee notices, and forward dossiers to LROs.
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -11,24 +12,33 @@ import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
+// BEHAVIOR: Lucide React icons matching steps and buttons
 import { CheckCircle2, Upload, Send, ArrowRight, Check, FileText, ExternalLink, Download, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
+// BACKEND_CONNECTION: Mock data modules emulating database entities
 import { mockTransferRequests, mockLandPlots } from "../../../data/mockData";
 
+// BEHAVIOR: Renders a helper file input component styled with custom borders
 const UploadItem = ({ label, fieldKey, files, onChange, onRemove }) => (
   <div className="space-y-1.5">
     <Label className="text-xs font-semibold">{label}</Label>
     <div className="space-y-2">
-      {files && files.map((file, idx) => (
-        <div key={idx} className="flex items-center gap-3 px-4 py-2 border border-[var(--terra-emerald)] bg-emerald-50/50 rounded-xl text-sm animate-in fade-in slide-in-from-left-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="text-emerald-700 font-medium truncate flex-1">{file.name}</span>
-          <button onClick={() => onRemove(idx)} className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+      {/* BEHAVIOR: Lists uploaded files dynamically with a delete trash trigger */}
+      {files && files.length > 0 && (
+        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+          {files.map((file, idx) => (
+            // COLOR_THEME: Uploaded files highlighted in soft emerald/green border styling
+            <div key={idx} className="flex items-center gap-3 px-4 py-2 border border-[var(--terra-emerald)] bg-emerald-50/50 rounded-xl text-sm animate-in fade-in slide-in-from-left-2 overflow-hidden">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-emerald-700 font-medium truncate flex-1 min-w-0 break-all">{file.name}</span>
+              <button onClick={() => onRemove(idx)} className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors shrink-0">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       <label
         htmlFor={fieldKey}
         className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-muted-foreground transition-colors text-sm"
@@ -60,7 +70,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState("");
 
-  // Sync step with startStep when modal opens
+  // BEHAVIOR: Syncs step state with startStep parameter on open events
   useEffect(() => {
     if (open) {
       setStep(startStep);
@@ -70,6 +80,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
   const request = mockTransferRequests.find((r) => r.id === requestId);
   const plot = request ? mockLandPlots.find((p) => p.landCode === request?.landCode) : null;
 
+  // BACKEND_CONNECTION: Simulates dispatching fee notice values to server backend
   const handleSendFeeNotice = () => {
     setStep(4);
     setTimeout(() => {
@@ -80,6 +91,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
     }, 400);
   };
 
+  // BACKEND_CONNECTION: Simulates forwarding documents to LRO on server backend
   const handleForwardToLRO = () => {
     setDone(true);
     toast.success("Documents forwarded to LRO!", {
@@ -105,6 +117,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
     setBuyerDocs(prev => prev.filter((_, i) => i !== index));
   };
 
+  // BACKEND_CONNECTION: Simulates document download triggers
   const handleDownloadDoc = (doc) => {
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 1500)),
@@ -143,6 +156,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
+            {/* COLOR_THEME: Uses Syne font for Title */}
             <DialogTitle className="font-['Syne'] text-lg">Verification — {request.landCode}</DialogTitle>
             <DialogDescription>
               {request.transferType === "purchase" ? "Deed of Sale" : "Inheritance"} · Buyer: {request.buyerName}
@@ -154,6 +168,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
             {stepLabels.map((label, i) => (
               <div key={i} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
+                  {/* COLOR_THEME: Colored dots based on active step: Completed uses Terra Emerald green, Current uses Terra Navy */}
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all ${
                     step > i + 1 ? "bg-[var(--terra-emerald)] text-white" : step === i + 1 ? "bg-[var(--terra-navy)] text-white" : "bg-muted text-muted-foreground"
                   }`}>
@@ -162,6 +177,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
                   <p className="text-[9px] mt-1 text-muted-foreground text-center">{label}</p>
                 </div>
                 {i < stepLabels.length - 1 && (
+                  // COLOR_THEME: Connective lines colored in green on progress
                   <div className={`h-0.5 flex-1 mb-4 transition-colors ${step > i + 1 ? "bg-[var(--terra-emerald)]" : "bg-muted"}`} />
                 )}
               </div>
@@ -182,6 +198,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
                   <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="capitalize font-medium">{request.transferType}</span></div>
                 </div>
                 <div className="space-y-2">
+                  {/* COLOR_THEME: Documents list elements highlighted in soft green border and background */}
                   {["CNI Document", request.transferType === "purchase" ? "Deed of Sale" : "Inheritance Certificate"].map((doc) => (
                     <div key={doc} className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/50 border-emerald-200 group">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -238,6 +255,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
                     className="min-h-[100px] text-sm"
                   />
                 </div>
+                {/* COLOR_THEME: Warn-info border styled in light amber highlights */}
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 space-y-1">
                   <p className="font-bold text-amber-800">Client will be notified:</p>
                   <p>→ SMS + Platform notification with payment instructions</p>
@@ -250,11 +268,13 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
             {/* Step 4: Forward to LRO */}
             {step === 4 && (
               <motion.div key="v4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+                {/* COLOR_THEME: Success message box styled in soft green color scheme */}
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-sm text-emerald-800 space-y-1">
                   <p className="font-bold">Fee notice sent ✓</p>
                   <p className="text-xs">Waiting for the client to upload their payment receipt. Once received, forward all documents to the LRO for the on-site visit and 30-day public notice.</p>
                 </div>
                 <div className="bg-muted/40 rounded-xl p-4 space-y-2 text-sm border">
+                  {/* COLOR_THEME: Action header styled in Terra Navy */}
                   <p className="font-bold text-[var(--terra-navy)] mb-1">What the LRO will do:</p>
                   <p className="text-xs text-muted-foreground">① Conduct an on-site visit to the property</p>
                   <p className="text-xs text-muted-foreground">② Publish a 30-day public notice on the platform</p>
@@ -270,21 +290,25 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
               <Button variant="outline" onClick={() => setStep(step - 1)}>Back</Button>
             )}
             {step === 1 && (
+              {/* COLOR_THEME: Submits button styled in Terra Navy background */}
               <Button onClick={() => setStep(2)} className="bg-[var(--terra-navy)] text-white gap-2 flex-1">
                 Approve &amp; Continue <ArrowRight className="w-4 h-4" />
               </Button>
             )}
             {step === 2 && (
+              {/* COLOR_THEME: Submits button styled in Terra Navy background */}
               <Button onClick={() => setStep(3)} disabled={buyerDocs.length === 0} className="bg-[var(--terra-navy)] text-white gap-2 flex-1">
                 Next <ArrowRight className="w-4 h-4" />
               </Button>
             )}
             {step === 3 && (
+              {/* COLOR_THEME: Notification trigger button styled in vibrant yellow/amber */}
               <Button onClick={handleSendFeeNotice} className="bg-amber-500 hover:bg-amber-600 text-white gap-2 flex-1">
                 <Send className="w-4 h-4" /> Send Fee Notice to Client
               </Button>
             )}
             {step === 4 && (
+              {/* COLOR_THEME: Final forward button styled in Terra Emerald green */}
               <Button onClick={handleForwardToLRO} className="bg-[var(--terra-emerald)] hover:bg-emerald-600 text-white gap-2 flex-1">
                 <Send className="w-4 h-4" /> Forward to LRO
               </Button>
@@ -346,6 +370,7 @@ export function VerificationModal({ requestId, open, onClose, startStep = 1 }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>Close Preview</Button>
+            {/* COLOR_THEME: Action trigger styled in Terra Navy background */}
             <Button onClick={handleFullScreen} className="bg-[var(--terra-navy)] text-white gap-2">
               <ExternalLink className="w-4 h-4" /> Open Full Screen
             </Button>

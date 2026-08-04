@@ -37,7 +37,9 @@ export const useLandPlots = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 60 seconds. Plots don't change very frequently
-    staleTime: 60 * 1000, // 60 seconds — plots don't change frequently
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -72,6 +74,8 @@ export const useMyLandPlots = () => {
       const cached = getCachedData('land_my-plots');
       return cached?.timestamp;
     },
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };

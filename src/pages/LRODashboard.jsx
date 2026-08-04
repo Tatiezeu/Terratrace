@@ -98,6 +98,19 @@ export default function LRODashboard() {
     return transfers.filter(req => !clearedTransferIds.includes(req._id));
   }, [transfers, clearedTransferIds]);
 
+  // Map plotId -> transfer for plots that have an active Public_Notice transfer
+  const publicNoticeTransferMap = useMemo(() => {
+    const map = {};
+    transfers
+      .filter(t => t.status === 'Public_Notice')
+      .forEach(t => {
+        const pId = t.plot?._id || t.plot;
+        const key = typeof pId === 'object' ? pId?._id?.toString() || pId?.toString() : pId?.toString();
+        if (key) map[key] = t;
+      });
+    return map;
+  }, [transfers]);
+
   const objectionPlotIds = useMemo(() => {
     return transfers
       .filter(t => t.objections && t.objections.length > 0)
@@ -108,21 +121,12 @@ export default function LRODashboard() {
       .filter(Boolean);
   }, [transfers]);
 
-  const applicationPlotIds = useMemo(() => {
-    return transfers
-      .map(t => {
-        const pId = t.plot?._id || t.plot;
-        return typeof pId === 'object' ? pId?._id?.toString() || pId?.toString() : pId?.toString();
-      })
-      .filter(Boolean);
-  }, [transfers]);
-
   const filteredPlots = useMemo(() => {
+    const now = new Date();
     return plots.filter((plot) => {
       const plotIdStr = plot._id?.toString();
-      const hasObjections = objectionPlotIds.includes(plotIdStr);
-      const isUnderApplication = applicationPlotIds.includes(plotIdStr);
-      if (!hasObjections && !isUnderApplication) return false;
+      // Only show plots that have an active (or recently expired) Public_Notice transfer
+      if (!publicNoticeTransferMap[plotIdStr]) return false;
 
       const q = searchQuery.toLowerCase();
       const ownerName = plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "";
@@ -130,7 +134,7 @@ export default function LRODashboard() {
       const matchesStatus = !activeStatusFilter || plot.status === activeStatusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, activeStatusFilter, plots, objectionPlotIds, applicationPlotIds]);
+  }, [searchQuery, activeStatusFilter, plots, publicNoticeTransferMap]);
 
   const visiblePlots = useMemo(() => {
     return filteredPlots.filter(plot => !clearedPlotIds.includes(plot._id));
@@ -376,16 +380,28 @@ export default function LRODashboard() {
                    <Badge className={`${statusConfig[plot.status]?.color || statusConfig.cleared.color} dark:bg-opacity-30 dark:border-opacity-30 border text-[10px] uppercase px-2 py-0.5`}>
                       {statusConfig[plot.status]?.label || plot.status}
                    </Badge>
-                   <Button 
-                     variant="outline" 
-                     size="sm" 
-                     disabled={!['under_review', 'under_transfer', 'disputed'].includes(plot.status) && !objectionPlotIds.includes(plot._id?.toString()) && !applicationPlotIds.includes(plot._id?.toString())}
-                     onClick={() => { setDisputeTarget({ id: plot._id, status: plot.status, code: plot.landCode }); setIsDisputeModalOpen(true); }}
-                     className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20", plot.status === 'disputed' && "bg-amber-600 text-white border-none", (!['under_review', 'under_transfer', 'disputed'].includes(plot.status) && !objectionPlotIds.includes(plot._id?.toString()) && !applicationPlotIds.includes(plot._id?.toString())) && "opacity-30 cursor-not-allowed")}
-                   >
-                     <AlertTriangle className="w-3.5 h-3.5" />
-                     {plot.status === 'disputed' ? 'Lift Dispute' : 'Dispute Land'}
-                   </Button>
+                   {(() => {
+                     const plotIdStr = plot._id?.toString();
+                     const noticeTransfer = publicNoticeTransferMap[plotIdStr];
+                     const noticeEnd = noticeTransfer?.publicNotice?.endDate ? new Date(noticeTransfer.publicNotice.endDate) : null;
+                     const noticeActive = noticeEnd ? new Date() < noticeEnd : false;
+                     const isDisputed = plot.status === 'disputed';
+                     // Can dispute: only when public notice is ACTIVE. Can lift dispute: always if it's disputed.
+                     const canAct = isDisputed || noticeActive;
+                     return (
+                       <Button 
+                         variant="outline" 
+                         size="sm" 
+                         disabled={!canAct}
+                         title={!canAct ? "Public notice period has expired — disputing is no longer available" : undefined}
+                         onClick={() => { setDisputeTarget({ id: plot._id, status: plot.status, code: plot.landCode }); setIsDisputeModalOpen(true); }}
+                         className={cn("h-8 gap-1.5 px-3 rounded-lg border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/20", isDisputed && "bg-amber-600 text-white border-none", !canAct && "opacity-30 cursor-not-allowed")}
+                       >
+                         <AlertTriangle className="w-3.5 h-3.5" />
+                         {isDisputed ? 'Lift Dispute' : noticeActive ? 'Dispute Land' : 'Notice Expired'}
+                       </Button>
+                     );
+                   })()}
                 </div>
               </div>
             ))}

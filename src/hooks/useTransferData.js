@@ -37,8 +37,10 @@ export const useMyTransfers = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: 10 seconds staleTime & 5-second polling interval for real-time workflow status sync
-    staleTime: 10 * 1000,
-    refetchInterval: 5000,
+    staleTime: 3 * 1000,
+    refetchInterval: 3000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -74,6 +76,9 @@ export const usePublicNotices = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 2 minutes — public notices are relatively static
-    staleTime: 2 * 60 * 1000, // 2 minutes — notices are semi-static
+    staleTime: 30 * 1000,
+    refetchInterval: 10000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };

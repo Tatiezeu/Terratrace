@@ -37,7 +37,10 @@ export const useNotifications = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 30 seconds. Checks frequently so notifications appear fast
-    staleTime: 30 * 1000, // 30 seconds — check frequently for new messages
+    staleTime: 10 * 1000,
+    refetchInterval: 10000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 };
 

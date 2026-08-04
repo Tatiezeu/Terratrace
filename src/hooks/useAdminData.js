@@ -37,7 +37,9 @@ export const useAllUsers = (options = {}) => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 2 minutes — will auto-refetch in background if data is older than 2 mins
-    staleTime: 2 * 60 * 1000, // 2 minutes — user registry changes infrequently
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     ...options,
   });
 };

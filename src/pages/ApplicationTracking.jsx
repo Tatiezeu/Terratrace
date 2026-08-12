@@ -18,16 +18,20 @@ import {
   BadgeCheck,
   Ban,
   Activity,
-  CheckCircle2
+  CheckCircle2,
+  Upload,
+  Smartphone
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../app/components/ui/card';
 import { Badge } from '../app/components/ui/badge';
 import { Button } from '../app/components/ui/button';
 import { Input } from '../app/components/ui/input';
+import { Label } from '../app/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 // BACKEND_CONNECTION: useMyTransfers fetches transfer dossiers matching user role
 import { useMyTransfers } from '../hooks/useTransferData';
+import api from '../utils/api';
 import { 
   Dialog, 
   DialogContent, 
@@ -50,6 +54,13 @@ export default function ApplicationTracking() {
   const [clearedAppIds, setClearedAppIds] = useState([]);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [activePaymentId, setActivePaymentId] = useState(null);
+
+  // Payment proof upload state (keyed by transfer id)
+  const [proofUploadOpenId, setProofUploadOpenId] = useState(null);
+  const [proofFile, setProofFile] = useState(null);
+  const [proofOperator, setProofOperator] = useState('MTN'); // 'MTN' or 'Orange'
+  const [proofReference, setProofReference] = useState('');
+  const [proofUploading, setProofUploading] = useState(false);
 
   // BEHAVIOR: Load cleared application IDs from localStorage on mount/user-change
   useEffect(() => {
@@ -164,6 +175,35 @@ export default function ApplicationTracking() {
     }
     setIsClearModalOpen(false);
     toast.success("Applications cleared from view successfully!");
+  };
+
+  const handleUploadProof = async (appId) => {
+    if (!proofFile) {
+      toast.error('Please select a screenshot to upload.');
+      return;
+    }
+    setProofUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('proofFile', proofFile);
+      formData.append('operator', proofOperator);
+      if (proofReference) formData.append('momoReference', proofReference);
+
+      const res = await api.post(`/transfer/${appId}/upload-proof`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success) {
+        toast.success('Payment proof submitted! Your notary has been notified.');
+        setProofUploadOpenId(null);
+        setProofFile(null);
+        setProofReference('');
+        refetchTransfers();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload proof.');
+    } finally {
+      setProofUploading(false);
+    }
   };
 
   const visibleApplicationsList = useMemo(() => {
@@ -497,27 +537,139 @@ export default function ApplicationTracking() {
                 </AnimatePresence>
 
                 {/* Bottom Bar: Action Trigger Drawer */}
-                <div className="flex justify-end pt-4 border-t border-gray-50 dark:border-white/10 items-center gap-2">
-                  {/* COLOR_THEME: Proceed to payment button colored in Gold */}
+                <div className="flex flex-col gap-3 pt-4 border-t border-gray-50 dark:border-white/10">
+
+                  {/* ── Payment Proof Upload Panel (escape hatch when CamPay fails) ── */}
                   {app.rawStatus === 'Awaiting_Fee_Payment' && (
-                    <Button 
-                      size="sm" 
-                      className="h-9 gap-2 text-xs font-bold bg-[#D4AF37] hover:bg-[#B8943A] text-[#002147] rounded-xl transition-all shadow-sm"
-                      onClick={() => setActivePaymentId(app.id)}
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Proceed to Payment
-                    </Button>
+                    <div className="w-full">
+                      {proofUploadOpenId === app.id ? (
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                              <Smartphone className="w-4 h-4" /> Payment Not Confirmed by App? Upload Proof
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => { setProofUploadOpenId(null); setProofFile(null); setProofReference(''); }}
+                              className="text-amber-600 dark:text-amber-400 text-[10px] font-bold hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+
+                          {/* Operator selector: MTN or Orange */}
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setProofOperator('MTN')}
+                              className={`flex-1 py-2 rounded-xl border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                proofOperator === 'MTN'
+                                  ? 'border-yellow-400 bg-yellow-400/20 text-yellow-800 dark:text-yellow-200'
+                                  : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-yellow-300'
+                              }`}
+                            >
+                              <span className="text-base">🟡</span> MTN MoMo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setProofOperator('Orange')}
+                              className={`flex-1 py-2 rounded-xl border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                proofOperator === 'Orange'
+                                  ? 'border-orange-400 bg-orange-400/20 text-orange-800 dark:text-orange-200'
+                                  : 'border-gray-200 dark:border-white/10 text-gray-400 hover:border-orange-300'
+                              }`}
+                            >
+                              <span className="text-base">🟠</span> Orange Money
+                            </button>
+                          </div>
+
+                          {/* Reference field */}
+                          <input
+                            type="text"
+                            placeholder={`${proofOperator === 'MTN' ? 'MTN MoMo' : 'Orange Money'} transaction reference (optional)`}
+                            value={proofReference}
+                            onChange={e => setProofReference(e.target.value)}
+                            className="w-full px-3 py-2 text-xs border border-amber-200 dark:border-amber-800/40 rounded-xl bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 dark:text-white"
+                          />
+
+                          {/* Screenshot upload */}
+                          <div
+                            onClick={() => document.getElementById(`proof-upload-${app.id}`).click()}
+                            className="border-2 border-dashed border-amber-300 dark:border-amber-800/60 rounded-xl p-4 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-amber-100/30 dark:hover:bg-amber-900/20 transition-all"
+                          >
+                            <Upload className="w-5 h-5 text-amber-500" />
+                            {proofFile ? (
+                              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 text-center">{proofFile.name}</p>
+                            ) : (
+                              <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold text-center">Click to upload your {proofOperator === 'MTN' ? 'MTN MoMo' : 'Orange Money'} screenshot<br/><span className="font-normal opacity-70">PNG, JPG, PDF accepted</span></p>
+                            )}
+                          </div>
+                          <input
+                            id={`proof-upload-${app.id}`}
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={e => setProofFile(e.target.files[0] || null)}
+                          />
+
+                          <button
+                            type="button"
+                            disabled={!proofFile || proofUploading}
+                            onClick={() => handleUploadProof(app.id)}
+                            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition-all flex items-center justify-center gap-2"
+                          >
+                            {proofUploading ? (
+                              <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting...</>
+                            ) : (
+                              <><CheckCircle2 className="w-3.5 h-3.5" /> Submit Payment Proof</>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between w-full">
+                          <button
+                            type="button"
+                            onClick={() => setProofUploadOpenId(app.id)}
+                            className="text-[10px] text-amber-600 dark:text-amber-400 font-bold underline underline-offset-2 hover:text-amber-800 transition-colors"
+                          >
+                            💡 Payment not confirmed by app? Upload MTN MoMo / Orange Money proof
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
-                  {/* COLOR_THEME: Inspect File button changes to Navy fill on hover */}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-9 gap-2 text-xs font-bold text-[#002147] dark:text-white group-hover:bg-[#002147] group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-[#002147] rounded-xl transition-all"
-                    onClick={() => setSelectedApp(app)}
-                  >
-                    <Info className="w-3.5 h-3.5" /> Inspect File Ledger
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Button>
+
+                  {/* Payment already submitted badge */}
+                  {app.rawStatus === 'Payment_Submitted' && (
+                    <div className="w-full flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Payment proof submitted — awaiting notary confirmation. Button disabled to prevent double submission.</p>
+                    </div>
+                  )}
+
+                  {/* Main action row */}
+                  <div className="flex justify-end items-center gap-2">
+                    {/* COLOR_THEME: Proceed to payment button colored in Gold */}
+                    {app.rawStatus === 'Awaiting_Fee_Payment' && proofUploadOpenId !== app.id && (
+                      <Button 
+                        size="sm" 
+                        className="h-9 gap-2 text-xs font-bold bg-[#D4AF37] hover:bg-[#B8943A] text-[#002147] rounded-xl transition-all shadow-sm"
+                        onClick={() => setActivePaymentId(app.id)}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Proceed to Payment
+                      </Button>
+                    )}
+                    {/* COLOR_THEME: Inspect File button changes to Navy fill on hover */}
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-9 gap-2 text-xs font-bold text-[#002147] dark:text-white group-hover:bg-[#002147] group-hover:text-white dark:group-hover:bg-white dark:group-hover:text-[#002147] rounded-xl transition-all"
+                      onClick={() => setSelectedApp(app)}
+                    >
+                      <Info className="w-3.5 h-3.5" /> Inspect File Ledger
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
               </motion.div>

@@ -17,7 +17,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
 
-import { getValidMatterportId } from "../../../utils/matterport";
+import { getValidMatterportId, getMatterportUrl } from "../../../utils/matterport";
 
 // BEHAVIOR: Resolves visual label and Tailwind color class for plot states
 const getStatusConfig = (status) => {
@@ -52,7 +52,6 @@ export function LandPlotModal({ plot, open, onClose }) {
 
   if (!plot) return null;
 
-  const effectiveMatterportId = getValidMatterportId(plot.matterportId, plot.landCode);
   const statusConfig = getStatusConfig(plot.status);
 
   const isOwner = user && (
@@ -63,9 +62,9 @@ export function LandPlotModal({ plot, open, onClose }) {
 
   return (
     <>
-      {/* 360 Fullscreen Overlay — portaled to document.body to fill exact main workspace area */}
+      {/* 360 Fullscreen Overlay — portaled to document.body to fill exact viewport */}
       {is360Maximized && createPortal(
-        <div className="fixed top-0 right-0 bottom-0 left-0 md:left-64 z-[999999] bg-[#090D14] flex flex-col p-6 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[999999] bg-[#090D14] flex flex-col p-6 animate-in fade-in duration-200">
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -79,11 +78,14 @@ export function LandPlotModal({ plot, open, onClose }) {
               <Minimize2 size={15} /> Exit Fullscreen
             </button>
           </div>
-          <div className="flex-1 mt-4 rounded-2xl overflow-hidden border border-white/10 bg-black">
+          <div className="flex-1 mt-4 rounded-2xl overflow-hidden border border-white/10 bg-black" style={{ height: 'calc(100vh - 96px)' }}>
             <iframe
-              src={`https://my.matterport.com/show/?m=${effectiveMatterportId}`}
+              key="modal-fullscreen"
+              src={getMatterportUrl(plot.matterportId, plot.landCode, false)}
               className="w-full h-full border-0"
-              allow="xr-spatial-tracking"
+              allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write; webvr; accelerometer; gyroscope"
+              allowFullScreen
+              referrerPolicy="no-referrer"
               title="360° Virtual Tour Fullscreen"
             />
           </div>
@@ -282,10 +284,11 @@ export function LandPlotModal({ plot, open, onClose }) {
             <TabsContent value="360" className="mt-6">
               <div className="relative aspect-video rounded-lg overflow-hidden bg-muted border border-border group">
                 <iframe
-                  src={`https://my.matterport.com/show/?m=${effectiveMatterportId}`}
-                  className="w-full h-full"
-                  frameBorder="0"
-                  allow="xr-spatial-tracking"
+                  src={getMatterportUrl(plot.matterportId, plot.landCode, false)}
+                  className="w-full h-full border-0"
+                  allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write; webvr; accelerometer; gyroscope"
+                  allowFullScreen
+                  referrerPolicy="no-referrer"
                   title="360° Virtual Tour"
                 />
                 <button

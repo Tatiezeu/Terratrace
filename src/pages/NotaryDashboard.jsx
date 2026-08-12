@@ -155,13 +155,41 @@ export default function NotaryDashboard() {
     setIsFeeModalOpen(true);
   };
 
-  const filteredRequests = requests.filter(r => 
-    (r.plot?.landCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    `${r.sender?.firstName} ${r.sender?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const handleConfirmPaymentManually = async () => {
+    if (!selectedRequest) return;
+    setActionLoadingId(selectedRequest._id);
 
-  const pendingQueue = filteredRequests.filter(r => r.status === 'Initiated');
-  const ongoingCases = filteredRequests.filter(r => ['Under_Verification', 'Awaiting_Fee_Payment', 'Payment_Submitted', 'Payment_Verified'].includes(r.status));
+    // Optimistic update
+    queryClient.setQueryData(['transfers'], (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.map(r => r._id === selectedRequest._id ? { ...r, status: 'Payment_Verified' } : r);
+    });
+
+    try {
+      const res = await api.post(`/transfer/${selectedRequest._id}/confirm-payment`);
+      if (res.data.success) {
+        toast.success('Payment confirmed! The client has been notified.');
+        queryClient.invalidateQueries({ queryKey: ['transfers'] });
+        setIsPaymentReceivedModalOpen(false);
+        setSelectedRequest(null);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to confirm payment.');
+      queryClient.invalidateQueries({ queryKey: ['transfers'] });
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const filteredRequests = useMemo(() => {
+    return requests.filter(r => 
+      (r.plot?.landCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      `${r.sender?.firstName} ${r.sender?.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [requests, searchQuery]);
+
+  const pendingQueue = useMemo(() => filteredRequests.filter(r => r.status === 'Initiated'), [filteredRequests]);
+  const ongoingCases = useMemo(() => filteredRequests.filter(r => ['Under_Verification', 'Awaiting_Fee_Payment', 'Payment_Submitted', 'Payment_Verified'].includes(r.status)), [filteredRequests]);
 
   const treatedCases = useMemo(() => {
     return filteredRequests.filter(r => ['Forwarded_to_LRO', 'Public_Notice', 'Completed', 'Rejected', 'Cancelled'].includes(r.status));
@@ -240,8 +268,20 @@ export default function NotaryDashboard() {
                       {req.status === 'Under_Verification' && (
                         <Button onClick={() => handleOpenPrepareFee(req)} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-9 px-4 font-bold shadow-sm">Prepare Fee Notice</Button>
                       )}
-                      {(req.status === 'Awaiting_Fee_Payment' || req.status === 'Payment_Submitted') && (
-                        <Button disabled className="bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-gray-600 rounded-lg h-9 px-6 font-bold flex items-center gap-2 cursor-not-allowed opacity-60">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
+                      {req.status === 'Awaiting_Fee_Payment' && (
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800/40 text-[10px] font-bold px-3 py-1.5">
+                            Fee Notice: {req.feeNotice?.amount ? `${Number(req.feeNotice.amount).toLocaleString()} CFA` : 'Sent'} — Awaiting Client Payment
+                          </Badge>
+                        </div>
+                      )}
+                      {req.status === 'Payment_Submitted' && (
+                        <Button
+                          onClick={() => { setSelectedRequest(req); setIsPaymentReceivedModalOpen(true); }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 px-4 font-bold shadow-sm flex items-center gap-2"
+                        >
+                          <CreditCard className="w-4 h-4" /> Verify Payment
+                        </Button>
                       )}
                       {req.status === 'Payment_Verified' && (
                         <Button onClick={() => { setSelectedRequest(req); setIsForwardModalOpen(true); }} className="bg-[var(--terra-navy)] hover:bg-blue-900 text-white rounded-lg h-9 px-6 font-bold flex items-center gap-2">Forward to LRO <ChevronRight className="w-4 h-4" /></Button>
@@ -460,73 +500,114 @@ export default function NotaryDashboard() {
 
       {/* Payment Received Modal */}
       <Dialog open={isPaymentReceivedModalOpen} onOpenChange={setIsPaymentReceivedModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-emerald-600">
-              <CheckCircle2 className="w-5 h-5" /> Payment Verification &amp; Certification
-            </DialogTitle>
-            <DialogDescription>Confirm processing fee receipt and upload the final certified land transfer documents.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-             <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/30 p-4 rounded-xl flex items-center gap-3">
-                <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-lg flex items-center justify-center shadow-sm"><CreditCard className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /></div>
+        <DialogContent className="max-w-lg rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-emerald-600">
+                <CheckCircle2 className="w-5 h-5" /> Verify Payment & Confirm
+              </DialogTitle>
+              <DialogDescription>Review the client's payment proof and confirm if the amount matches the fee notice.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+
+              {/* Fee notice reference */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/30 p-3 rounded-xl flex items-center justify-between">
                 <div>
-                   <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Verify Processing Fee</p>
-                   <p className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-80">Ensure the amount matches the fee notice sent to the client.</p>
+                  <p className="text-[10px] uppercase font-black text-blue-600 dark:text-blue-400">Expected Fee Amount</p>
+                  <p className="text-lg font-black text-blue-800 dark:text-blue-200">
+                    {selectedRequest?.feeNotice?.amount
+                      ? `${Number(selectedRequest.feeNotice.amount).toLocaleString()} CFA`
+                      : 'N/A'}
+                  </p>
+                  {selectedRequest?.feeNotice?.description && (
+                    <p className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5 italic">{selectedRequest.feeNotice.description}</p>
+                  )}
                 </div>
-             </div>
-             
-             <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Final Certified Documents</Label>
-                <div className="relative">
-                   <div onClick={() => document.getElementById('certified_upload').click()} className="border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/30 transition-all">
-                      <UploadIcon className="w-8 h-8 text-muted-foreground" />
-                      <div className="text-center">
-                         <p className="text-sm font-bold">Upload Certified Deed &amp; Dossier</p>
-                         <p className="text-[10px] text-muted-foreground">PDF, JPG, or PNG (Multiple allowed)</p>
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+
+              {/* Client payment proof screenshot */}
+              {selectedRequest?.paymentReceipt ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <FileCheck className="w-4 h-4 text-emerald-500" /> Client Payment Screenshot
+                  </p>
+                  {/* Reference number if manual */}
+                  {selectedRequest?.campayReference?.startsWith('MANUAL-') && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Operator:</span>
+                      <span className="text-xs font-black text-[#002147] dark:text-white">
+                        {selectedRequest.campayReference.split('-')[1] === 'Orange' ? '🟠 Orange Money' : '🟡 MTN MoMo'}
+                      </span>
+                      {selectedRequest.campayReference.split('-')[2] && (
+                        <>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase ml-2">Ref:</span>
+                          <span className="text-xs font-mono text-emerald-700 dark:text-emerald-400">{selectedRequest.campayReference.split('-').slice(2).join('-')}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <a
+                    href={`http://localhost:5001${selectedRequest.paymentReceipt}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full"
+                  >
+                    <div className="relative w-full rounded-2xl overflow-hidden border-2 border-emerald-200 dark:border-emerald-800/50 hover:border-emerald-400 transition-all group cursor-zoom-in">
+                      <img
+                        src={`http://localhost:5001${selectedRequest.paymentReceipt}`}
+                        alt="Payment proof screenshot"
+                        className="w-full max-h-52 object-contain bg-gray-50 dark:bg-slate-800"
+                        onError={e => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                      <div className="hidden w-full h-20 items-center justify-center text-xs text-muted-foreground gap-2">
+                        <FileCheck className="w-5 h-5" /> Click to open payment proof (PDF/document)
                       </div>
-                   </div>
-                   <input 
-                     id="certified_upload" 
-                     type="file" 
-                     multiple 
-                     className="hidden" 
-                     onChange={(e) => setCertifiedDocs(prev => [...prev, ...Array.from(e.target.files)])} 
-                   />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                        <ExternalLink className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                      </div>
+                    </div>
+                  </a>
+                  <p className="text-[9px] text-center text-muted-foreground italic">Click image to open full-size in new tab</p>
                 </div>
-                {certifiedDocs.length > 0 && (
-                   <div className="flex flex-wrap gap-2 pt-2">
-                      {certifiedDocs.map((f, i) => (
-                        <Badge key={i} variant="secondary" className="text-[9px] gap-1.5 px-2 py-1 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800/40 flex items-center">
-                           <FileCheck className="w-3 h-3 text-emerald-600 shrink-0" /> 
-                           <span className="truncate max-w-[150px]">{f.name}</span>
-                           <button
-                             type="button"
-                             onClick={(e) => {
-                               e.preventDefault();
-                               e.stopPropagation();
-                               setCertifiedDocs(certifiedDocs.filter((_, idx) => idx !== i));
-                             }}
-                             className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors flex items-center justify-center shrink-0"
-                           >
-                             <X className="w-3 h-3" />
-                           </button>
-                        </Badge>
-                      ))}
-                   </div>
+              ) : (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/30 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span>No payment screenshot uploaded by client yet. You can still confirm if you verified the payment through other means.</span>
+                </div>
+              )}
+
+              {/* Warning */}
+              <div className="bg-amber-50/50 dark:bg-amber-950/10 p-3 rounded-xl text-[10px] text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-800/20 italic">
+                ⚠️ By confirming, you certify that the payment amount matches the fee notice and the client's dossier is ready to be forwarded to the Land Registry Officer.
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsPaymentReceivedModalOpen(false)}
+                className="rounded-xl h-11 dark:text-white dark:hover:bg-white/10"
+                disabled={actionLoadingId === selectedRequest?._id}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleConfirmPaymentManually}
+                disabled={actionLoadingId === selectedRequest?._id}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 h-11 rounded-xl font-bold uppercase tracking-widest text-xs flex items-center gap-2"
+              >
+                {actionLoadingId === selectedRequest?._id ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Confirming...</>
+                ) : (
+                  <><CheckCircle2 className="w-4 h-4" /> Confirm Payment ✓</>
                 )}
-             </div>
-          </div>
-          <DialogFooter>
-             <Button 
-               disabled={certifiedDocs.length === 0}
-               onClick={() => handleUpdateStatus(selectedRequest._id, 'Payment_Verified', { certifiedDocuments: certifiedDocs })} 
-               className="bg-emerald-600 hover:bg-emerald-700 text-white w-full h-12 rounded-xl font-bold uppercase tracking-widest text-xs"
-             >
-                Confirm Payment &amp; Certify Dossier
-             </Button>
-          </DialogFooter>
-        </DialogContent>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
       </Dialog>
 
       {/* Other Modals (Fee, Forward) */}

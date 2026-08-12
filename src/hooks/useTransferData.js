@@ -16,15 +16,30 @@ export const useMyTransfers = () => {
     // BEHAVIOR: Cache key identifier for user transfers
     queryKey: ['transfers'],
     // BACKEND_CONNECTION: GET /transfer/my-transfers - Retrieves all transfer dossiers relevant to the logged-in user (as sender, buyer, LRO, or Notary)
-    queryFn: async () => {
-      const response = await api.get('/transfer/my-transfers');
-      if (!response.data.success) {
-        throw new Error('Failed to fetch transfer requests');
+    queryFn: async ({ signal }) => {
+      // BEHAVIOR: ETag-based conditional request — skip re-processing if data hasn't changed
+      const cachedEtag = sessionStorage.getItem('etag_transfers');
+      const headers = cachedEtag ? { 'If-None-Match': cachedEtag } : {};
+      try {
+        const response = await api.get('/transfer/my-transfers', { headers, signal });
+        if (response.status === 304) {
+          // Not modified — return cached data as-is
+          const cached = getCachedData('transfers');
+          return cached?.data ?? [];
+        }
+        if (!response.data.success) throw new Error('Failed to fetch transfer requests');
+        const data = response.data.data;
+        const newEtag = response.headers['etag'];
+        if (newEtag) sessionStorage.setItem('etag_transfers', newEtag);
+        setCachedData('transfers', data);
+        return data;
+      } catch (err) {
+        if (err?.response?.status === 304) {
+          const cached = getCachedData('transfers');
+          return cached?.data ?? [];
+        }
+        throw err;
       }
-      const data = response.data.data;
-      // BEHAVIOR: Persists transfers list inside localStorage cache
-      setCachedData('transfers', data);
-      return data;
     },
     // BEHAVIOR: Retreives initial transfers array from local cache
     initialData: () => {
@@ -37,8 +52,9 @@ export const useMyTransfers = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: 10 seconds staleTime & 5-second polling interval for real-time workflow status sync
-    staleTime: 3 * 1000,
-    refetchInterval: 3000,
+    staleTime: 5 * 1000,
+    refetchInterval: 6000,       // Poll every 6s — still fast for workflow status updates
+    refetchIntervalInBackground: false, // Stop polling when tab is hidden — saves bandwidth
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });

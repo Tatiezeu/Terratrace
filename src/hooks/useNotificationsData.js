@@ -39,6 +39,7 @@ export const useNotifications = () => {
     // BEHAVIOR: Stale time of 30 seconds. Checks frequently so notifications appear fast
     staleTime: 10 * 1000,
     refetchInterval: 10000,
+    refetchIntervalInBackground: false, // Only poll when app tab is active
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });

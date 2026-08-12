@@ -94,54 +94,65 @@ export default function LRODashboard() {
     }
   }, [user]);
 
+  const getPlotIdStr = (plotRef) => {
+    if (!plotRef) return '';
+    if (typeof plotRef === 'string') return plotRef;
+    if (plotRef._id) return plotRef._id.toString();
+    return plotRef.toString();
+  };
+
   const visibleTransfers = useMemo(() => {
-    return transfers.filter(req => !clearedTransferIds.includes(req._id));
+    return transfers.filter(req => {
+      const idStr = req._id?.toString();
+      return !clearedTransferIds.includes(idStr) &&
+        ['Forwarded_to_LRO', 'Public_Notice', 'Completed', 'Rejected'].includes(req.status);
+    });
   }, [transfers, clearedTransferIds]);
 
-  // Map plotId -> transfer for plots that have an active Public_Notice transfer
+  // Map plotId -> transfer for plots that have an active or recent Public_Notice transfer
   const publicNoticeTransferMap = useMemo(() => {
     const map = {};
-    transfers
-      .filter(t => t.status === 'Public_Notice')
-      .forEach(t => {
-        const pId = t.plot?._id || t.plot;
-        const key = typeof pId === 'object' ? pId?._id?.toString() || pId?.toString() : pId?.toString();
+    (transfers || []).forEach(t => {
+      if (t.status === 'Public_Notice' || (t.publicNotice && t.publicNotice.startDate)) {
+        const key = getPlotIdStr(t.plot);
         if (key) map[key] = t;
-      });
+      }
+    });
     return map;
   }, [transfers]);
 
   const objectionPlotIds = useMemo(() => {
-    return transfers
+    return (transfers || [])
       .filter(t => t.objections && t.objections.length > 0)
-      .map(t => {
-        const pId = t.plot?._id || t.plot;
-        return typeof pId === 'object' ? pId?._id?.toString() || pId?.toString() : pId?.toString();
-      })
+      .map(t => getPlotIdStr(t.plot))
       .filter(Boolean);
   }, [transfers]);
 
   const filteredPlots = useMemo(() => {
-    const now = new Date();
     return plots.filter((plot) => {
-      const plotIdStr = plot._id?.toString();
-      // Only show plots that have an active (or recently expired) Public_Notice transfer
-      if (!publicNoticeTransferMap[plotIdStr]) return false;
+      const plotIdStr = getPlotIdStr(plot);
+      // Show plot if it has a Public_Notice transfer OR if it's currently disputed
+      const hasNotice = !!publicNoticeTransferMap[plotIdStr];
+      const isDisputed = plot.status === 'disputed';
+      if (!hasNotice && !isDisputed) return false;
 
       const q = searchQuery.toLowerCase();
-      const ownerName = plot.owner ? `${plot.owner.firstName} ${plot.owner.lastName}` : "";
-      const matchesSearch = !q || plot.landCode.toLowerCase().includes(q) || plot.location.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q);
+      const ownerName = plot.owner ? `${plot.owner.firstName || ''} ${plot.owner.lastName || ''}` : "";
+      const matchesSearch = !q || plot.landCode?.toLowerCase().includes(q) || plot.location?.toLowerCase().includes(q) || ownerName.toLowerCase().includes(q);
       const matchesStatus = !activeStatusFilter || plot.status === activeStatusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [searchQuery, activeStatusFilter, plots, publicNoticeTransferMap]);
 
   const visiblePlots = useMemo(() => {
-    return filteredPlots.filter(plot => !clearedPlotIds.includes(plot._id));
+    return filteredPlots.filter(plot => {
+      const idStr = getPlotIdStr(plot);
+      return !clearedPlotIds.includes(idStr);
+    });
   }, [filteredPlots, clearedPlotIds]);
 
   const handleClearAllTransfers = () => {
-    const idsToClear = visibleTransfers.map(t => t._id);
+    const idsToClear = visibleTransfers.map(t => t._id?.toString()).filter(Boolean);
     const updated = [...new Set([...clearedTransferIds, ...idsToClear])];
     setClearedTransferIds(updated);
     if (user) {
@@ -152,7 +163,7 @@ export default function LRODashboard() {
   };
 
   const handleClearAllPlots = () => {
-    const idsToClear = visiblePlots.map(p => p._id);
+    const idsToClear = visiblePlots.map(p => getPlotIdStr(p)).filter(Boolean);
     const updated = [...new Set([...clearedPlotIds, ...idsToClear])];
     setClearedPlotIds(updated);
     if (user) {
@@ -381,7 +392,7 @@ export default function LRODashboard() {
                       {statusConfig[plot.status]?.label || plot.status}
                    </Badge>
                    {(() => {
-                     const plotIdStr = plot._id?.toString();
+                     const plotIdStr = getPlotIdStr(plot);
                      const noticeTransfer = publicNoticeTransferMap[plotIdStr];
                      const noticeEnd = noticeTransfer?.publicNotice?.endDate ? new Date(noticeTransfer.publicNotice.endDate) : null;
                      const noticeActive = noticeEnd ? new Date() < noticeEnd : false;

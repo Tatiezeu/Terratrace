@@ -37,9 +37,10 @@ export const useLandPlots = () => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 60 seconds. Plots don't change very frequently
-    staleTime: 30 * 1000,
-    refetchOnMount: true,
+    staleTime: 60 * 1000,        // Plots change rarely — 60s is fine
+    refetchOnMount: 'always',    // Always revalidate on mount to get fresh plot status
     refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false,
   });
 };
 
@@ -75,7 +76,8 @@ export const useMyLandPlots = () => {
       return cached?.timestamp;
     },
     staleTime: 30 * 1000,
-    refetchOnMount: true,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false,
   });
 };

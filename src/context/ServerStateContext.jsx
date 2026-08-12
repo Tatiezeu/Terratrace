@@ -151,9 +151,11 @@ export const useServerState = () => {
  * 
  * @param {string} key - Unique query key identifying the cached data slice.
  * @param {Function} fetchFn - Async function returning the fetched server data.
+ * @param {Object} options - Optional config: { staleTime } in ms (default 30000).
  */
-export const useServerQuery = (key, fetchFn) => {
-  // BEHAVIOR: Subscribes hook instance to ServerState Context Provider
+export const useServerQuery = (key, fetchFn, options = {}) => {
+  const staleTime = options.staleTime ?? 30 * 1000; // default 30 seconds
+
   const {
     cache,
     loading,
@@ -165,46 +167,49 @@ export const useServerQuery = (key, fetchFn) => {
     optimisticUpdate
   } = useServerState();
 
-  // Stabilize fetchFn reference with useRef to avoid infinite loops from
-  // inline arrow functions re-created on every parent render.
+  // Track last fetch timestamp per key using a ref (shared across re-renders, not state)
+  const lastFetchTsRef = React.useRef({});
+
   const fetchFnRef = React.useRef(fetchFn);
   React.useEffect(() => {
     fetchFnRef.current = fetchFn;
   });
 
-  // Stable fetch wrapper that always uses the latest fetchFn from the ref
   const stableFetch = React.useCallback(async () => {
-    // BACKEND_CONNECTION: Calls backend query through the stable reference
-    return fetchFnRef.current();
-  }, []); // empty deps — this function never changes reference
+    const result = await fetchFnRef.current();
+    lastFetchTsRef.current[key] = Date.now();
+    return result;
+  }, [key]);
 
-  // Register the stable fetch function once only
   React.useEffect(() => {
     registerQuery(key, stableFetch);
   }, [key, stableFetch, registerQuery]);
 
-  // Fetch on component mount to keep cache fresh (stale-while-revalidate)
   React.useEffect(() => {
-    // BACKEND_CONNECTION: Executes call on mount
-    fetchQuery(key, stableFetch).catch(() => {});
-  }, [key, stableFetch, fetchQuery]);
+    const now = Date.now();
+    const lastFetch = lastFetchTsRef.current[key] || 0;
+    const isStale = (now - lastFetch) > staleTime;
+    const hasData = cache[key] !== undefined;
+    // Only fetch if data is missing or stale
+    if (!hasData || isStale) {
+      fetchQuery(key, stableFetch).catch(() => {});
+    }
+  }, [key, stableFetch, fetchQuery, staleTime, cache]);
 
   return {
-    // BEHAVIOR: The cached data segment
     data: cache[key],
-    // BEHAVIOR: True if cache is empty and query is loading data initially
     isLoading: loading[key] || (cache[key] === undefined && !errors[key]),
-    // BEHAVIOR: True if query is fetching in the background
     isFetching: loading[key],
-    // BEHAVIOR: Error object if query failed
     error: errors[key],
-    // BACKEND_CONNECTION: Manual trigger to invoke query re-fetch from the backend
-    refetch: () => fetchQuery(key, stableFetch),
-    // BEHAVIOR: Manual cache state mutator
+    refetch: () => {
+      lastFetchTsRef.current[key] = 0; // bust cache
+      return fetchQuery(key, stableFetch);
+    },
     setData: (newData) => setQueryData(key, newData),
-    // BACKEND_CONNECTION: Manual trigger to execute an optimistic mutation
     optimisticMutate: (optimisticData, mutationFn) => optimisticUpdate(key, optimisticData, mutationFn),
-    // BACKEND_CONNECTION: Manual trigger to mark query as dirty and force backend reload
-    invalidate: () => invalidateQuery(key)
+    invalidate: () => {
+      lastFetchTsRef.current[key] = 0; // bust cache
+      return invalidateQuery(key);
+    }
   };
 };

@@ -44,7 +44,7 @@ import {
   DialogTitle,
 } from "../app/components/ui/dialog";
 import { logActivity } from "../utils/logger";
-import { getValidMatterportId } from "../utils/matterport";
+import { getValidMatterportId, getMatterportUrl } from "../utils/matterport";
 
 // BEHAVIOR: Map of region codes to names and capitals
 const REGION_CODES = [
@@ -383,12 +383,14 @@ export default function ClientDashboard() {
               {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </Button>
           </DialogHeader>
-          <div className={cn("w-full", isMaximized ? "flex-1 h-full" : "aspect-video")}>
+          <div className={cn("w-full", isMaximized ? "flex-1 h-full min-h-[80vh]" : "aspect-video")}>
             {/* BACKEND_CONNECTION: Pulls external Matterport 360 tour for spatial maps review */}
             <iframe 
-              src={`https://my.matterport.com/show/?m=${getValidMatterportId(matterportPlot?.matterportId, matterportPlot?.landCode)}`} 
+              src={getMatterportUrl(matterportPlot?.matterportId, matterportPlot?.landCode, false)} 
               className="w-full h-full border-0" 
-              allow="xr-spatial-tracking" 
+              allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write; webvr; accelerometer; gyroscope" 
+              allowFullScreen
+              referrerPolicy="no-referrer"
               title="Matterport 360 Tour"
             />
           </div>

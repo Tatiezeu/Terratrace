@@ -37,9 +37,10 @@ export const useAllUsers = (options = {}) => {
       return cached?.timestamp;
     },
     // BEHAVIOR: Stale time of 2 minutes — will auto-refetch in background if data is older than 2 mins
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,   // 2 minutes — user list rarely changes
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false, // Don't refetch user list on tab focus — wastes bandwidth
+    refetchIntervalInBackground: false,
     ...options,
   });
 };

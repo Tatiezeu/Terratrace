@@ -423,21 +423,52 @@ export default function PaymentPage({ id: propId, isModal = false, onClose, onSu
   // Background status checker polling when in 'processing' screen
   useEffect(() => {
     if (screen !== "processing") return;
-    const interval = setInterval(async () => {
+    
+    let attempts = 0;
+    let timerId;
+    let isCancelled = false;
+    
+    const pollPaymentStatus = async () => {
+      if (isCancelled) return;
+      
+      attempts++;
+      
+      if (attempts > 30) {
+        toast.error("Payment verification is taking too long. You can upload payment proof.");
+        return; // Stop polling
+      }
+      
       try {
         // BACKEND_CONNECTION: GET /transfer/:id/check-payment polls transaction verification state on the backend
         const response = await api.get(`/transfer/${id}/check-payment`);
         if (response.data.success && response.data.data.status === 'Payment_Verified') {
-          clearInterval(interval);
-          toast.success("Payment verified automatically!");
-          setScreen("success");
+          if (!isCancelled) {
+            toast.success("Payment verified automatically!");
+            setScreen("success");
+          }
+          return;
         }
       } catch (err) {
         console.warn("Polling payment check failed:", err);
       }
-    }, 2000);
+      
+      if (!isCancelled) {
+        let delay = 2000;
+        if (attempts > 10) {
+          delay = 10000;
+        } else if (attempts > 3) {
+          delay = 5000;
+        }
+        timerId = setTimeout(pollPaymentStatus, delay);
+      }
+    };
+    
+    pollPaymentStatus();
 
-    return () => clearInterval(interval);
+    return () => {
+      isCancelled = true;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [screen, id]);
 
   const user = rawUser ? {

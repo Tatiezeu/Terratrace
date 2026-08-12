@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShieldAlert, Mail, Users, History, Lock, CircleAlert,
   Smartphone, Database, Activity, ScrollText, Ban, Trash2,
@@ -25,7 +25,6 @@ import { mockActivityLogs } from "../data/mockData";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import api from "../utils/api";
-import { useEffect } from "react";
 import { useServerQuery, useServerState } from "../context/ServerStateContext";
 import { useQuery } from "@tanstack/react-query";
 import { logActivity } from "../utils/logger";
@@ -50,12 +49,26 @@ export default function SettingsPage() {
   const [noticeDurationDays, setNoticeDurationDays] = useState(30);
   const [noticeTestMode, setNoticeTestMode] = useState(false);
   const [noticeTestMinutes, setNoticeTestMinutes] = useState(10);
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState(() => {
+    try {
+      const raw = localStorage.getItem('settings_users_cache');
+      if (raw) { const p = JSON.parse(raw); if (Date.now() - p.ts < 5 * 60 * 1000) return p.data; }
+    } catch (_) {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const raw = localStorage.getItem('settings_users_cache');
+      if (raw) { const p = JSON.parse(raw); return !(Date.now() - p.ts < 5 * 60 * 1000); }
+    } catch (_) {}
+    return true;
+  });
   const [recaptchaEnabled, setRecaptchaEnabled] = useState(() => {
     return localStorage.getItem('recaptcha_enabled') !== 'false';
   });
-  const [recaptchaMode, setRecaptchaMode] = useState("hybrid");
+  const [recaptchaMode, setRecaptchaMode] = useState(() => {
+    return localStorage.getItem('recaptcha_mode') || 'smart';
+  });
   const [recaptchaAttempts, setRecaptchaAttempts] = useState(3);
 
   // CamPay & Escrow States
@@ -120,7 +133,7 @@ export default function SettingsPage() {
 
   const { data: serverUsers } = useServerQuery('settings_users', async () => {
     const response = await api.get('/users');
-    return response.data.data.map(u => ({
+    const mapped = response.data.data.map(u => ({
       id: u._id,
       name: `${u.firstName} ${u.lastName}`,
       email: u.email,
@@ -130,7 +143,19 @@ export default function SettingsPage() {
       tfa: u.twoFactorEnabled,
       avatar: u.profilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.firstName}`
     }));
-  });
+    // Cache to localStorage for instant display on next visit
+    try { localStorage.setItem('settings_users_cache', JSON.stringify({ data: mapped, ts: Date.now() })); } catch (_) {}
+    return mapped;
+  }, { staleTime: 60 * 1000 });
+
+  // Show cached users immediately while fresh data loads in background
+  const cachedUsersInit = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem('settings_users_cache');
+      if (raw) { const p = JSON.parse(raw); if (Date.now() - p.ts < 5 * 60 * 1000) return p.data; }
+    } catch (_) {}
+    return undefined;
+  }, []);
 
   const { data: serverConfig } = useServerQuery('settings_config', async () => {
     const response = await api.get('/config');
@@ -792,25 +817,68 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between p-6 bg-white/80 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl shadow-sm">
                     <div className="space-y-1">
                       <p className="font-bold text-sm text-[#002147] dark:text-white">Enable reCAPTCHA Shield</p>
-                      <p className="text-xs text-muted-foreground dark:text-gray-400">Force human verification on login and registration pages.</p>
+                      <p className="text-xs text-muted-foreground dark:text-gray-400">Protect authentication portals with intelligent bot verification.</p>
                     </div>
                     <Switch 
                       checked={recaptchaEnabled} 
                       onCheckedChange={(checked) => {
                         setRecaptchaEnabled(checked);
                         localStorage.setItem('recaptcha_enabled', checked.toString());
-                        toast.success(checked ? "reCAPTCHA Shield activated globally!" : "reCAPTCHA Shield deactivated globally!");
+                        toast.success(checked ? "reCAPTCHA Shield activated!" : "reCAPTCHA Shield deactivated!");
                       }}
                       className="data-[state=checked]:bg-emerald-500"
                     />
                   </div>
 
+                  {recaptchaEnabled && (
+                    <div className="p-4 bg-white/80 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl space-y-3 shadow-sm">
+                      <p className="font-bold text-xs text-[#002147] dark:text-white uppercase tracking-wider">Challenge Frequency Mode</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecaptchaMode('smart');
+                            localStorage.setItem('recaptcha_mode', 'smart');
+                            toast.info("Smart Risk Mode active: Challenge appears probabilistically (~35% of sessions) like real production sites.");
+                          }}
+                          className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
+                            recaptchaMode === 'smart' 
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20' 
+                              : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          <p className="font-black text-sm">Smart Risk Mode</p>
+                          <p className="font-normal text-[11px] opacity-80 mt-1">Appears sometimes (~35% of sessions) based on risk scoring, matching real websites.</p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecaptchaMode('strict');
+                            localStorage.setItem('recaptcha_mode', 'strict');
+                            toast.info("Strict Mode active: Challenge appears on 100% of logins.");
+                          }}
+                          className={`p-3 rounded-xl border text-xs font-bold text-left transition-all ${
+                            recaptchaMode === 'strict' 
+                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500/20' 
+                              : 'bg-gray-50 dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400'
+                          }`}
+                        >
+                          <p className="font-black text-sm">Strict Mode</p>
+                          <p className="font-normal text-[11px] opacity-80 mt-1">Triggers visual challenge 100% of the time for every attempt.</p>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-2">
                     <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Active Policy Summary</p>
                     <p className="text-xs text-emerald-900/80 dark:text-emerald-300/80 leading-relaxed">
                       {recaptchaEnabled 
-                        ? "Currently active. All portal entryways are fully protected. Unauthenticated clients will undergo an automated 1.5s behavioral risk assessment."
-                        : "Security bypass active. reCAPTCHA challenge is disabled, and authentication requests will pass directly through to standard 2FA checkpoints."}
+                        ? (recaptchaMode === 'smart' 
+                            ? "Smart Risk Mode active. Visual reCAPTCHA challenges trigger probabilistically (~35% of sessions) based on risk scoring, matching real-world site behavior." 
+                            : "Strict Mode active. Visual reCAPTCHA challenges trigger on 100% of authentication attempts.")
+                        : "Security bypass active. reCAPTCHA challenge is disabled, and authentication requests pass directly through to standard 2FA checkpoints."}
                     </p>
                   </div>
                 </div>
@@ -825,14 +893,16 @@ export default function SettingsPage() {
                       <div>
                         <p className="font-bold text-emerald-900 dark:text-white leading-none">Security Shield Status</p>
                         <p className={`text-xs mt-1 ${recaptchaEnabled ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-gray-500'}`}>
-                          {recaptchaEnabled ? 'Active & Defending Portals' : 'Disabled / Bypassed'}
+                          {recaptchaEnabled 
+                            ? (recaptchaMode === 'smart' ? 'Active (Smart Risk Mode)' : 'Active (Strict Mode)') 
+                            : 'Disabled / Bypassed'}
                         </p>
                       </div>
                     </div>
                     <div className="space-y-2 pt-2 border-t border-emerald-100 dark:border-white/10">
                       <div className="flex justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
                         <span>Dynamic Scoring Threshold:</span>
-                        <span>0.5 (Interactive Pass)</span>
+                        <span>0.65 (Adaptive Sampling)</span>
                       </div>
                       <div className="flex justify-between text-xs font-bold text-emerald-800 dark:text-emerald-300">
                         <span>MFA Threat Verifications:</span>
@@ -855,6 +925,7 @@ export default function SettingsPage() {
                 <Button 
                   onClick={() => {
                     localStorage.setItem('recaptcha_enabled', recaptchaEnabled.toString());
+                    localStorage.setItem('recaptcha_mode', recaptchaMode);
                     toast.success("reCAPTCHA policies synchronized and saved successfully!");
                   }}
                   className="bg-[var(--terra-navy)] hover:bg-[#003d7a] text-white px-8 rounded-xl h-11 shadow-lg"

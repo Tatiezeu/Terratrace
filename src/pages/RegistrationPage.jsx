@@ -36,7 +36,20 @@ export default function RegistrationPage() {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
   const [isCaptchaRequired] = useState(() => {
-    return localStorage.getItem('recaptcha_enabled') !== 'false';
+    const isEnabled = localStorage.getItem('recaptcha_enabled') !== 'false';
+    if (!isEnabled) return false;
+
+    const mode = localStorage.getItem('recaptcha_mode') || 'smart';
+    if (mode === 'strict') return true;
+
+    // Smart Risk Mode: challenge appears probabilistically (~35% of sessions) like real production sites
+    let sessionRisk = sessionStorage.getItem('recaptcha_risk_flagged');
+    if (sessionRisk === null) {
+      const isRiskFlagged = Math.random() < 0.35;
+      sessionStorage.setItem('recaptcha_risk_flagged', isRiskFlagged ? 'true' : 'false');
+      return isRiskFlagged;
+    }
+    return sessionRisk === 'true';
   });
 
   // Custom reCAPTCHA v2 States

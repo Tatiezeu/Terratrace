@@ -1,190 +1,185 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Check, RefreshCw, HelpCircle, Eye } from "lucide-react";
+import { Check, RefreshCw, HelpCircle } from "lucide-react";
 import { Button } from "../ui/button";
 
-// 33 images covering 11 categories
+// 93 real downloaded images covering 31 categories (3 per category)
 const CAPTCHA_IMAGES_DATA = [
-  // Cars
+  // 1. Cars
   { id: "car-1", category: "Cars", url: "/captcha/car-1.jpg" },
   { id: "car-2", category: "Cars", url: "/captcha/car-2.jpg" },
   { id: "car-3", category: "Cars", url: "/captcha/car-3.jpg" },
-  
-  // Bridges
+
+  // 2. Bridges
   { id: "bridge-1", category: "Bridges", url: "/captcha/bridge-1.jpg" },
   { id: "bridge-2", category: "Bridges", url: "/captcha/bridge-2.jpg" },
   { id: "bridge-3", category: "Bridges", url: "/captcha/bridge-3.jpg" },
-  
-  // Stairs
+
+  // 3. Stairs
   { id: "stairs-1", category: "Stairs", url: "/captcha/stairs-1.jpg" },
   { id: "stairs-2", category: "Stairs", url: "/captcha/stairs-2.jpg" },
   { id: "stairs-3", category: "Stairs", url: "/captcha/stairs-3.jpg" },
-  
-  // Bicycles
+
+  // 4. Bicycles
   { id: "bike-1", category: "Bicycles", url: "/captcha/bike-1.jpg" },
   { id: "bike-2", category: "Bicycles", url: "/captcha/bike-2.jpg" },
   { id: "bike-3", category: "Bicycles", url: "/captcha/bike-3.jpg" },
-  
-  // Traffic Lights
+
+  // 5. Traffic Lights
   { id: "light-1", category: "Traffic Lights", url: "/captcha/light-1.jpg" },
   { id: "light-2", category: "Traffic Lights", url: "/captcha/light-2.jpg" },
   { id: "light-3", category: "Traffic Lights", url: "/captcha/light-3.jpg" },
-  
-  // Crosswalks
+
+  // 6. Crosswalks
   { id: "walk-1", category: "Crosswalks", url: "/captcha/walk-1.jpg" },
   { id: "walk-2", category: "Crosswalks", url: "/captcha/walk-2.jpg" },
   { id: "walk-3", category: "Crosswalks", url: "/captcha/walk-3.jpg" },
-  
-  // Fire Hydrants
+
+  // 7. Fire Hydrants
   { id: "hydrant-1", category: "Fire Hydrants", url: "/captcha/hydrant-1.jpg" },
   { id: "hydrant-2", category: "Fire Hydrants", url: "/captcha/hydrant-2.jpg" },
   { id: "hydrant-3", category: "Fire Hydrants", url: "/captcha/hydrant-3.jpg" },
-  
-  // Buses
+
+  // 8. Buses
   { id: "bus-1", category: "Buses", url: "/captcha/bus-1.jpg" },
   { id: "bus-2", category: "Buses", url: "/captcha/bus-2.jpg" },
   { id: "bus-3", category: "Buses", url: "/captcha/bus-3.jpg" },
-  
-  // Mountains
+
+  // 9. Mountains
   { id: "mountain-1", category: "Mountains", url: "/captcha/mountain-1.jpg" },
   { id: "mountain-2", category: "Mountains", url: "/captcha/mountain-2.jpg" },
   { id: "mountain-3", category: "Mountains", url: "/captcha/mountain-3.jpg" },
-  
-  // Trees
+
+  // 10. Trees
   { id: "tree-1", category: "Trees", url: "/captcha/tree-1.jpg" },
   { id: "tree-2", category: "Trees", url: "/captcha/tree-2.jpg" },
   { id: "tree-3", category: "Trees", url: "/captcha/tree-3.jpg" },
- 
-  // Motos
-  { id: "moto-1", category: "Motos", url: "/captcha/moto-1.jpg" },
-  { id: "moto-2", category: "Motos", url: "/captcha/moto-2.jpg" },
-  { id: "moto-3", category: "Motos", url: "/captcha/moto-3.jpg" }
+
+  // 11. Motorcycles
+  { id: "moto-1", category: "Motorcycles", url: "/captcha/moto-1.jpg" },
+  { id: "moto-2", category: "Motorcycles", url: "/captcha/moto-2.jpg" },
+  { id: "moto-3", category: "Motorcycles", url: "/captcha/moto-3.jpg" },
+
+  // 12. Boats
+  { id: "boat-1", category: "Boats", url: "/captcha/boat-1.jpg" },
+  { id: "boat-2", category: "Boats", url: "/captcha/boat-2.jpg" },
+  { id: "boat-3", category: "Boats", url: "/captcha/boat-3.jpg" },
+
+  // 13. Airplanes
+  { id: "plane-1", category: "Airplanes", url: "/captcha/plane-1.jpg" },
+  { id: "plane-2", category: "Airplanes", url: "/captcha/plane-2.jpg" },
+  { id: "plane-3", category: "Airplanes", url: "/captcha/plane-3.jpg" },
+
+  // 14. Dogs
+  { id: "dog-1", category: "Dogs", url: "/captcha/dog-1.jpg" },
+  { id: "dog-2", category: "Dogs", url: "/captcha/dog-2.jpg" },
+  { id: "dog-3", category: "Dogs", url: "/captcha/dog-3.jpg" },
+
+  // 15. Cats
+  { id: "cat-1", category: "Cats", url: "/captcha/cat-1.jpg" },
+  { id: "cat-2", category: "Cats", url: "/captcha/cat-2.jpg" },
+  { id: "cat-3", category: "Cats", url: "/captcha/cat-3.jpg" },
+
+  // 16. Doors
+  { id: "door-1", category: "Doors", url: "/captcha/door-1.jpg" },
+  { id: "door-2", category: "Doors", url: "/captcha/door-2.jpg" },
+  { id: "door-3", category: "Doors", url: "/captcha/door-3.jpg" },
+
+  // 17. Benches
+  { id: "bench-1", category: "Benches", url: "/captcha/bench-1.jpg" },
+  { id: "bench-2", category: "Benches", url: "/captcha/bench-2.jpg" },
+  { id: "bench-3", category: "Benches", url: "/captcha/bench-3.jpg" },
+
+  // 18. Clocks
+  { id: "clock-1", category: "Clocks", url: "/captcha/clock-1.jpg" },
+  { id: "clock-2", category: "Clocks", url: "/captcha/clock-2.jpg" },
+  { id: "clock-3", category: "Clocks", url: "/captcha/clock-3.jpg" },
+
+  // 19. Flowers
+  { id: "flower-1", category: "Flowers", url: "/captcha/flower-1.jpg" },
+  { id: "flower-2", category: "Flowers", url: "/captcha/flower-2.jpg" },
+  { id: "flower-3", category: "Flowers", url: "/captcha/flower-3.jpg" },
+
+  // 20. Rivers
+  { id: "river-1", category: "Rivers", url: "/captcha/river-1.jpg" },
+  { id: "river-2", category: "Rivers", url: "/captcha/river-2.jpg" },
+  { id: "river-3", category: "Rivers", url: "/captcha/river-3.jpg" },
+
+  // 21. Chairs
+  { id: "chair-1", category: "Chairs", url: "/captcha/chair-1.jpg" },
+  { id: "chair-2", category: "Chairs", url: "/captcha/chair-2.jpg" },
+  { id: "chair-3", category: "Chairs", url: "/captcha/chair-3.jpg" },
+
+  // 22. Streetlamps
+  { id: "lamp-1", category: "Streetlamps", url: "/captcha/lamp-1.jpg" },
+  { id: "lamp-2", category: "Streetlamps", url: "/captcha/lamp-2.jpg" },
+  { id: "lamp-3", category: "Streetlamps", url: "/captcha/lamp-3.jpg" },
+
+  // 23. Fences
+  { id: "fence-1", category: "Fences", url: "/captcha/fence-1.jpg" },
+  { id: "fence-2", category: "Fences", url: "/captcha/fence-2.jpg" },
+  { id: "fence-3", category: "Fences", url: "/captcha/fence-3.jpg" },
+
+  // 24. Flags
+  { id: "flag-1", category: "Flags", url: "/captcha/flag-1.jpg" },
+  { id: "flag-2", category: "Flags", url: "/captcha/flag-2.jpg" },
+  { id: "flag-3", category: "Flags", url: "/captcha/flag-3.jpg" },
+
+  // 25. Tractors
+  { id: "tractor-1", category: "Tractors", url: "/captcha/tractor-1.jpg" },
+  { id: "tractor-2", category: "Tractors", url: "/captcha/tractor-2.jpg" },
+  { id: "tractor-3", category: "Tractors", url: "/captcha/tractor-3.jpg" },
+
+  // 26. Ambulances
+  { id: "ambulance-1", category: "Ambulances", url: "/captcha/ambulance-1.jpg" },
+  { id: "ambulance-2", category: "Ambulances", url: "/captcha/ambulance-2.jpg" },
+  { id: "ambulance-3", category: "Ambulances", url: "/captcha/ambulance-3.jpg" },
+
+  // 27. Laptops
+  { id: "laptop-1", category: "Laptops", url: "/captcha/laptop-1.jpg" },
+  { id: "laptop-2", category: "Laptops", url: "/captcha/laptop-2.jpg" },
+  { id: "laptop-3", category: "Laptops", url: "/captcha/laptop-3.jpg" },
+
+  // 28. Phones
+  { id: "phone-1", category: "Phones", url: "/captcha/phone-1.jpg" },
+  { id: "phone-2", category: "Phones", url: "/captcha/phone-2.jpg" },
+  { id: "phone-3", category: "Phones", url: "/captcha/phone-3.jpg" },
+
+  // 29. Buildings
+  { id: "building-1", category: "Buildings", url: "/captcha/building-1.jpg" },
+  { id: "building-2", category: "Buildings", url: "/captcha/building-2.jpg" },
+  { id: "building-3", category: "Buildings", url: "/captcha/building-3.jpg" },
+
+  // 30. Umbrellas
+  { id: "umbrella-1", category: "Umbrellas", url: "/captcha/umbrella-1.jpg" },
+  { id: "umbrella-2", category: "Umbrellas", url: "/captcha/umbrella-2.jpg" },
+  { id: "umbrella-3", category: "Umbrellas", url: "/captcha/umbrella-3.jpg" },
+
+  // 31. Ships
+  { id: "ship-1", category: "Ships", url: "/captcha/ship-1.jpg" },
+  { id: "ship-2", category: "Ships", url: "/captcha/ship-2.jpg" },
+  { id: "ship-3", category: "Ships", url: "/captcha/ship-3.jpg" },
 ];
 
-const CATEGORIES = ["Cars", "Bridges", "Stairs", "Bicycles", "Traffic Lights", "Crosswalks", "Fire Hydrants", "Buses", "Mountains", "Trees", "Motos"];
+const CATEGORIES = [
+  "Cars", "Bridges", "Stairs", "Bicycles", "Traffic Lights", "Crosswalks",
+  "Fire Hydrants", "Buses", "Mountains", "Trees", "Motorcycles",
+  "Boats", "Airplanes", "Dogs", "Cats", "Doors", "Benches", "Clocks",
+  "Flowers", "Rivers", "Chairs", "Streetlamps", "Fences", "Flags",
+  "Tractors", "Ambulances", "Laptops", "Phones", "Buildings", "Umbrellas", "Ships",
+];
 
-// Modern offline vector fallbacks for ultimate network resilience
-const renderFallbackIcon = (category, isSelected) => {
+// Fallback tile renderer in case an image fails to load
+const renderSvgTile = (category, isSelected) => {
   const baseClasses = `w-full h-full flex flex-col items-center justify-center p-2 text-white select-none transition-all duration-300 ${
     isSelected ? "scale-90 brightness-75 blur-[0.5px]" : "hover:scale-105"
   }`;
 
-  switch (category) {
-    case "Cars":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-orange-400 to-red-600`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
-            <circle cx="7" cy="17" r="2" />
-            <circle cx="17" cy="17" r="2" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Car</span>
-        </div>
-      );
-    case "Bridges":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-indigo-500 to-purple-700`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12h18M12 3v9M6 12v6M18 12v6" />
-            <path d="M6 18c0-3 3-3 6-3s6 0 6 3" />
-            <path d="M3 12c3-4 6-4 9-4s6 0 9 4" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Bridge</span>
-        </div>
-      );
-    case "Stairs":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-teal-400 to-emerald-600`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 21h18M3 21v-4h4v-4h4v-4h4v-4h4V5" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Stairs</span>
-        </div>
-      );
-    case "Bicycles":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-emerald-400 to-cyan-500`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="5.5" cy="17.5" r="2.5" />
-            <circle cx="18.5" cy="17.5" r="2.5" />
-            <path d="M15 6h5.5M12 12h3.5l2.5-6M5.5 17.5L9.5 9h6M12 12v5.5" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Bicycle</span>
-        </div>
-      );
-    case "Traffic Lights":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-slate-700 to-slate-900`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="7" y="2" width="10" height="20" rx="3" />
-            <circle cx="12" cy="7" r="1.5" className="fill-red-500 stroke-red-500" />
-            <circle cx="12" cy="12" r="1.5" className="fill-yellow-500 stroke-yellow-500" />
-            <circle cx="12" cy="17" r="1.5" className="fill-green-500 stroke-green-500" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Light</span>
-        </div>
-      );
-    case "Crosswalks":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-blue-500 to-indigo-700`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18M3 10h18M3 14h18M3 18h18" strokeDasharray="3 3" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Walkway</span>
-        </div>
-      );
-    case "Fire Hydrants":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-rose-500 to-red-700`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 14h14M9 5c0-1.7 1.3-3 3-3s3 1.3 3 3v14c0 1.7-1.3 3-3 3s-3-1.3-3-3V5ZM5 9h14M12 9v10" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Hydrant</span>
-        </div>
-      );
-    case "Buses":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-yellow-400 to-amber-600`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="4" y="4" width="16" height="12" rx="2" />
-            <circle cx="7.5" cy="18" r="1.5" />
-            <circle cx="16.5" cy="18" r="1.5" />
-            <path d="M4 14h16M10 8h4" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Bus</span>
-        </div>
-      );
-    case "Mountains":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-cyan-600 to-blue-800`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m8 3 4 8 5-5 5 15H2L8 3Z" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Mountain</span>
-        </div>
-      );
-    case "Motos":
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-purple-500 to-indigo-600`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="5.5" cy="17.5" r="2.5" />
-            <circle cx="18.5" cy="17.5" r="2.5" />
-            <path d="M12 10V6H9M5.5 17.5l3-6.5h7.5L18.5 17.5M10.5 13h3.5" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Moto</span>
-        </div>
-      );
-    case "Trees":
-    default:
-      return (
-        <div className={`${baseClasses} bg-gradient-to-br from-green-500 to-emerald-800`}>
-          <svg className="w-10 h-10 text-white drop-shadow-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 19-7-7h14l-7 7ZM12 13-5-5h10l-5 5ZM12 7-3-3h6l-3 3ZM12 19v3" />
-          </svg>
-          <span className="text-[8px] font-black tracking-widest uppercase mt-1 text-white/90">Tree</span>
-        </div>
-      );
-  }
+  return (
+    <div className={`${baseClasses} bg-gradient-to-br from-slate-700 to-slate-900`}>
+      <span className="text-[10px] font-black tracking-widest uppercase text-white/90">{category}</span>
+    </div>
+  );
 };
 
 export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
@@ -195,31 +190,20 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
   const [errorMsg, setErrorMsg] = useState("");
 
   const generateChallenge = () => {
-    // 1. Choose a random target category
     const randomCategory = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
     setTargetCategory(randomCategory);
     setSelectedIds(new Set());
     setFailedImages(new Set());
     setErrorMsg("");
 
-    // 2. Fetch all matching target images and all distractors
     const targets = CAPTCHA_IMAGES_DATA.filter((img) => img.category === randomCategory);
     const distractors = CAPTCHA_IMAGES_DATA.filter((img) => img.category !== randomCategory);
-
-    // 3. Determine target count (between 3 and 5)
     const targetCount = Math.floor(Math.random() * 3) + 3; // 3, 4, or 5
-
-    // Shuffle both sets
     const shuffledTargets = [...targets].sort(() => 0.5 - Math.random());
     const shuffledDistractors = [...distractors].sort(() => 0.5 - Math.random());
-
-    // Select the required amounts
     const selectedTargets = shuffledTargets.slice(0, targetCount);
-    // Dynamically calculate distractor count to guarantee exactly 9 total images in the grid
     const distractorCount = 9 - selectedTargets.length;
     const selectedDistractors = shuffledDistractors.slice(0, distractorCount);
-
-    // Combine and shuffle the final 9 images
     const finalNine = [...selectedTargets, ...selectedDistractors].sort(() => 0.5 - Math.random());
     setDisplayedImages(finalNine);
   };
@@ -230,36 +214,24 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
 
   const handleTileClick = (id) => {
     const nextSelected = new Set(selectedIds);
-    if (nextSelected.has(id)) {
-      nextSelected.delete(id);
-    } else {
-      nextSelected.add(id);
-    }
+    if (nextSelected.has(id)) nextSelected.delete(id);
+    else nextSelected.add(id);
     setSelectedIds(nextSelected);
   };
 
   const handleVerify = () => {
-    // Find all target IDs currently shown in the grid
     const targetIdsInGrid = displayedImages
       .filter((img) => img.category === targetCategory)
       .map((img) => img.id);
-
-    // Get selected array
     const selectedArray = Array.from(selectedIds);
-
-    // Verify 100% match
     const hasAllTargets = targetIdsInGrid.every((id) => selectedIds.has(id));
-    const hasNoDistractors = selectedArray.every((id) =>
-      targetIdsInGrid.includes(id)
-    );
+    const hasNoDistractors = selectedArray.every((id) => targetIdsInGrid.includes(id));
 
     if (hasAllTargets && hasNoDistractors && selectedArray.length > 0) {
       onSuccess();
     } else {
       setErrorMsg("Please try again. Your selection did not match correctly.");
-      setTimeout(() => {
-        generateChallenge();
-      }, 1000);
+      setTimeout(() => generateChallenge(), 1000);
     }
   };
 
@@ -281,7 +253,7 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
         </p>
       </div>
 
-      {/* Error Feedback Message Overlay */}
+      {/* Error Feedback */}
       <AnimatePresence>
         {errorMsg && (
           <motion.div
@@ -295,11 +267,12 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
         )}
       </AnimatePresence>
 
-      {/* 3x3 CSS Grid */}
+      {/* 3×3 Grid */}
       <div className="grid grid-cols-3 gap-2 mb-4 bg-gray-50 p-2 rounded-xl border border-gray-100">
         {displayedImages.map((img) => {
           const isSelected = selectedIds.has(img.id);
           const hasFailed = failedImages.has(img.id);
+
           return (
             <div
               key={img.id}
@@ -307,11 +280,11 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
               className="relative aspect-square rounded-lg overflow-hidden cursor-pointer shadow-inner border border-gray-100/50 group bg-gray-100 flex items-center justify-center"
             >
               {hasFailed ? (
-                renderFallbackIcon(img.category, isSelected)
+                renderSvgTile(img.category, isSelected)
               ) : (
                 <img
                   src={img.url}
-                  alt="captcha element"
+                  alt={img.category}
                   onError={() => {
                     setFailedImages((prev) => {
                       const next = new Set(prev);
@@ -325,7 +298,7 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
                 />
               )}
 
-              {/* Dynamic checkmark overlay with smooth zoom-in spring motion */}
+              {/* Checkmark overlay */}
               <AnimatePresence>
                 {isSelected && (
                   <motion.div
@@ -346,7 +319,7 @@ export default function VisualCaptchaChallenge({ onSuccess, onCancel }) {
         })}
       </div>
 
-      {/* Interactive Bottom Control Toolbar */}
+      {/* Bottom Toolbar */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
         <div className="flex items-center gap-1">
           <button

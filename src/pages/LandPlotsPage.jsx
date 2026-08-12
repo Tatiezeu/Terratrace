@@ -31,7 +31,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { useLandPlots } from "../hooks/useLandData";
 import { logActivity } from "../utils/logger";
 import { cn } from "../app/components/ui/utils";
-import { getValidMatterportId } from "../utils/matterport";
+import { getValidMatterportId, getMatterportUrl } from "../utils/matterport";
 
 export default function LandPlotsPage() {
   // ─── Server state via TanStack Query (cached, deduped) ────────────────────
@@ -427,12 +427,18 @@ export default function LandPlotsPage() {
               {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </Button>
           </DialogHeader>
-          <div className={cn("w-full", isMaximized ? "flex-1 h-full" : "aspect-video")}>
+          <div
+            className={cn("w-full overflow-hidden", isMaximized ? "flex-1 min-h-0" : "aspect-video")}
+            style={isMaximized ? { height: 'calc(92vh - 72px)' } : {}}
+          >
             {/* BACKEND_CONNECTION: Pulls Matterport 3D scan iframe data */}
             <iframe
-              src={`https://my.matterport.com/show/?m=${getValidMatterportId(matterportPlot?.matterportId, matterportPlot?.landCode)}`}
+              key={isMaximized ? 'matterport-max' : 'matterport-normal'}
+              src={getMatterportUrl(matterportPlot?.matterportId, matterportPlot?.landCode, false)}
               className="w-full h-full border-0"
-              allow="xr-spatial-tracking"
+              allow="autoplay; fullscreen; xr-spatial-tracking; clipboard-write; webvr; accelerometer; gyroscope"
+              allowFullScreen
+              referrerPolicy="no-referrer"
               title="Matterport 360 Tour"
             />
           </div>
